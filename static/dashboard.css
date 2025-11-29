@@ -81,7 +81,7 @@
     width: 100%;
     height: 100%;
     object-fit: contain; /* はみ出し防止 */
-    background: #000;
+    background: #fff;
 }
 
 /* 編集アイコン (ホバー時に出る) */
