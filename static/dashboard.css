@@ -105,3 +105,39 @@
     font-weight: bold;
     color: #007bff;
 }
+
+/* --- テーマ別スタイル (ラズパイ側の定義をベースに調整) --- */
+
+/* default: 白背景 */
+.theme-default {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+/* urgent: 緊急 (赤) */
+.theme-urgent {
+    background-color: #dc3545 !important; /* Bootstrapの色を強制上書き */
+    color: #ffffff !important;
+    border: 3px solid #ffcccc !important;
+}
+/* 中の文字色も白にする */
+.theme-urgent .slot-preview, 
+.theme-urgent .slot-type-badge {
+    color: #ffffff;
+}
+
+/* info: お知らせ (青) */
+.theme-info {
+    background-color: #e7f1ff !important;
+    color: #004085 !important;
+    border: 3px solid #b8daff !important;
+}
+.theme-info .slot-preview { color: #004085; }
+
+/* happy: お祝い (黄) */
+.theme-happy {
+    background-color: #fff3cd !important;
+    color: #856404 !important;
+    border: 3px solid #ffeeba !important;
+}
+.theme-happy .slot-preview { color: #856404; }

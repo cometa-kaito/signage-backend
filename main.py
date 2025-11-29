@@ -128,6 +128,9 @@ def get_display_config(school_id: str, db: Session = Depends(get_db)):
     if not school:
         raise HTTPException(status_code=404, detail="School not found")
     
+    school.last_heartbeat = datetime.now()
+    db.commit() # 保存
+    
     # 座標（今回は固定値。本来はschoolテーブルから取得）
     lat = 35.3912
     lon = 136.7223
@@ -233,15 +236,33 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     school = user.school
     
+    # ★追加: 死活監視の判定ロジック
+    is_online = False
+    last_seen_str = "データなし"
+
+    if school.last_heartbeat:
+        # 最終通信からの経過時間を計算
+        delta = datetime.now() - school.last_heartbeat
+        # 10分以内 (600秒) ならオンラインとみなす
+        if delta.total_seconds() < 600:
+            is_online = True
+        
+        # 表示用に時刻を文字列化 (例: 11/30 14:30)
+        last_seen_str = school.last_heartbeat.strftime("%m/%d %H:%M")
+
+    # スロットデータの取得 (既存コード)
     slots_data = []
     for slot in sorted(school.slots, key=lambda x: x.position):
         content = db.query(models.Content).filter(models.Content.slot_id == slot.id).first()
         slots_data.append({"slot": slot, "content": content})
 
+    # テンプレートに status 情報を渡す
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "school": school,
-        "slots_data": slots_data
+        "slots_data": slots_data,
+        "is_online": is_online,       # ★追加
+        "last_seen": last_seen_str    # ★追加
     })
 
 @app.post("/update_content")

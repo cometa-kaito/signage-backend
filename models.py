@@ -42,9 +42,12 @@ class School(Base):
     """学校テーブル"""
     __tablename__ = "schools"
 
-    id = Column(String, primary_key=True, index=True) # IDはUUIDなどを手動設定（例: "gifu-kosen"）
+    id = Column(String, primary_key=True, index=True)
     name = Column(String)
-    layout_type = Column(Integer, default=4) # 1〜6
+    layout_type = Column(Integer, default=4)
+    
+    # ★追加: 最終通信時刻 (初期値はNone)
+    last_heartbeat = Column(DateTime, nullable=True)
 
     # リレーション
     users = relationship("User", back_populates="school")
