@@ -31,6 +31,7 @@
                 <a href="/admin/ads" class="btn btn-warning btn-sm me-3 text-dark fw-bold">
                     <i class="bi bi-shield-check"></i> 広告審査
                 </a>
+
                 <span class="text-light me-3">レイアウト: {{ slots_data|length }}分割</span>
                 <a href="/logout" class="btn btn-outline-light btn-sm">ログアウト</a>
             </div>
@@ -45,10 +46,10 @@
         <div id="preview-grid" class="layout-{{ slots_data|length }}">
             {% for item in slots_data %}
             <div class="dashboard-slot slot-{{ item.slot.position }}" 
-                data-id="{{ item.slot.id }}"
-                data-type="{{ item.slot.content_type }}"
-                data-body="{{ item.content.body or '' }}"
-                onclick="openEditModal(this)">
+                 data-id="{{ item.slot.id }}"
+                 data-type="{{ item.slot.content_type }}"
+                 data-body="{{ item.content.body or '' }}"
+                 onclick="openEditModal(this)">
                 
                 <span class="slot-type-badge bg-{{ 'primary' if item.slot.content_type == 'notice' else 'warning' if item.slot.content_type == 'ad' else 'success' }}">
                     {{ item.slot.content_type }}
@@ -79,7 +80,8 @@
     </div>
 
     <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg"> <div class="modal-content">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
                 <form id="editForm" action="/update_content" method="post" enctype="multipart/form-data">
                     <div class="modal-header">
                         <h5 class="modal-title">コンテンツ編集</h5>
@@ -133,12 +135,14 @@
     <script>
         let cropper; // Cropperインスタンス保持用
 
-        function openEditModal(slotId, contentType, currentBody) {
+        // ★修正済み関数: 要素(this)を受け取ってデータを取得する
+        function openEditModal(element) {
             // データ属性から値を取得
             const slotId = element.getAttribute('data-id');
             const contentType = element.getAttribute('data-type');
             const currentBody = element.getAttribute('data-body');
 
+            // 取得した値をモーダルにセット
             document.getElementById('modalSlotId').value = slotId;
             document.getElementById('modalSlotType').innerText = contentType;
             
@@ -174,55 +178,43 @@
                 const reader = new FileReader();
                 
                 reader.onload = function(e) {
-                    // 画像を表示してCropper起動
                     const image = document.getElementById('cropImage');
                     image.src = e.target.result;
                     
                     document.querySelector('.img-container').style.display = 'block';
                     document.getElementById('cropMessage').classList.remove('d-none');
 
-                    // 以前のCropperがあれば破棄
                     if (cropper) {
                         cropper.destroy();
                     }
                     
-                    // Cropper初期化
                     cropper = new Cropper(image, {
-                        aspectRatio: NaN, // 自由な比率（枠に合わせてトリミング）
-                        viewMode: 1,      // 画像枠からはみ出さない
-                        autoCropArea: 0.9 // 最初から90%を選択状態に
+                        aspectRatio: NaN,
+                        viewMode: 1,
+                        autoCropArea: 0.9
                     });
                 };
                 reader.readAsDataURL(file);
             }
         });
 
-        // フォーム送信時の処理（ここがキモ！）
+        // フォーム送信時の処理
         document.getElementById('editForm').addEventListener('submit', function(e) {
-            // Cropperが起動している場合のみ処理
             if (cropper) {
-                e.preventDefault(); // 一旦送信を止める
-
-                // トリミング結果をCanvasとして取得
+                e.preventDefault(); 
                 cropper.getCroppedCanvas({
-                    maxWidth: 1920, // 大きすぎないようにリサイズ
+                    maxWidth: 1920, 
                     maxHeight: 1080
                 }).toBlob((blob) => {
-                    // BlobをFileオブジェクトに変換
                     const fileInput = document.getElementById('fileInput');
-                    // 元のファイル名を引き継ぐ
                     const fileName = fileInput.files[0].name; 
                     const newFile = new File([blob], fileName, { type: "image/jpeg" });
 
-                    // DataTransferを使ってinputの中身を差し替える！
                     const dataTransfer = new DataTransfer();
                     dataTransfer.items.add(newFile);
                     fileInput.files = dataTransfer.files;
 
-                    // Cropperを片付けて、再送信しないようにフラグを消して、本当に送信
                     resetCropper();
-                    
-                    // 再帰ループを防ぐために、このイベントリスナーをバイパスしてsubmit
                     e.target.submit(); 
                 }, 'image/jpeg', 0.9);
             }
