@@ -3,7 +3,22 @@
 <head>
     <title>ダッシュボード - {{ school.name }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <link href="/static/dashboard.css" rel="stylesheet">
+    
+    <style>
+        /* トリミング領域のスタイル */
+        .img-container {
+            max-height: 400px;
+            width: 100%;
+            background-color: #f7f7f7;
+            margin-bottom: 15px;
+            display: none; /* 初期は非表示 */
+        }
+        .img-container img {
+            max-width: 100%;
+        }
+    </style>
 </head>
 <body class="bg-light">
 
@@ -25,7 +40,6 @@
         </div>
 
         <div id="preview-grid" class="layout-{{ slots_data|length }}">
-            
             {% for item in slots_data %}
             <div class="dashboard-slot slot-{{ item.slot.position }}" 
                  onclick="openEditModal('{{ item.slot.id }}', '{{ item.slot.content_type }}', '{{ item.content.body or '' }}')">
@@ -37,13 +51,10 @@
                 <div class="slot-preview">
                     {% if item.slot.content_type == 'ad' %}
                         <div class="text-white">
-                            <i class="bi bi-collection-play"></i> スライドショー<br>
-                            (自動配信)
+                            <i class="bi bi-collection-play"></i> スライドショー<br>(自動配信)
                         </div>
                     {% elif item.slot.content_type == 'weather' %}
-                        <div class="text-white">
-                            天気予報<br>(自動配信)
-                        </div>
+                        <div class="text-white">天気予報<br>(自動配信)</div>
                     {% elif item.content.media_url %}
                         <img src="{{ item.content.media_url }}">
                     {% elif item.content.body %}
@@ -58,17 +69,15 @@
                 </div>
             </div>
             {% endfor %}
-
         </div>
     </div>
 
     <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form action="/update_content" method="post" enctype="multipart/form-data">
+        <div class="modal-dialog modal-lg"> <div class="modal-content">
+                <form id="editForm" action="/update_content" method="post" enctype="multipart/form-data">
                     <div class="modal-header">
                         <h5 class="modal-title">コンテンツ編集</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="slot_id" id="modalSlotId">
@@ -76,7 +85,6 @@
                         <div class="mb-3">
                             <label class="form-label">枠の種類:</label>
                             <span id="modalSlotType" class="badge bg-secondary"></span>
-                            <p class="text-muted small" id="modalTypeDesc"></p>
                         </div>
 
                         <div id="formNotice" class="d-none">
@@ -84,19 +92,25 @@
                                 <label class="form-label">メッセージ本文</label>
                                 <textarea name="body" id="modalBody" class="form-control" rows="4"></textarea>
                             </div>
+                            
                             <div class="mb-3">
-                                <label class="form-label">画像 (任意)</label>
-                                <input type="file" name="file" class="form-control">
+                                <label class="form-label">画像アップロード</label>
+                                <input type="file" name="file" id="fileInput" class="form-control" accept="image/*">
+                            </div>
+
+                            <div class="img-container">
+                                <img id="cropImage" src="">
+                            </div>
+                            <div id="cropMessage" class="form-text text-primary d-none">
+                                ※四隅をドラッグして、表示したい範囲を指定してください。
                             </div>
                         </div>
 
                         <div id="formAuto" class="d-none">
                             <div class="alert alert-info">
-                                この枠はシステムまたは広告主によって自動配信されています。<br>
-                                教員画面から個別の編集はできません。
+                                この枠はシステムまたは広告主によって自動配信されています。
                             </div>
                         </div>
-
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
@@ -108,36 +122,109 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
     <script>
+        let cropper; // Cropperインスタンス保持用
+
         function openEditModal(slotId, contentType, currentBody) {
-            // 値をセット
             document.getElementById('modalSlotId').value = slotId;
             document.getElementById('modalSlotType').innerText = contentType;
             
-            // フォームの切り替え
             const formNotice = document.getElementById('formNotice');
             const formAuto = document.getElementById('formAuto');
             const submitBtn = document.getElementById('submitBtn');
+            const fileInput = document.getElementById('fileInput');
+
+            // フォームのリセット（重要）
+            fileInput.value = ''; 
+            resetCropper(); 
 
             if (contentType === 'notice') {
-                // お知らせの場合: 編集可能
                 formNotice.classList.remove('d-none');
                 formAuto.classList.add('d-none');
                 submitBtn.disabled = false;
-                
-                // 現在の本文を入れる
                 document.getElementById('modalBody').value = currentBody;
             } else {
-                // 天気・広告の場合: 編集不可（案内のみ）
                 formNotice.classList.add('d-none');
                 formAuto.classList.remove('d-none');
-                submitBtn.disabled = true; // ボタン無効化
+                submitBtn.disabled = true;
             }
 
-            // モーダルを表示
             var myModal = new bootstrap.Modal(document.getElementById('editModal'));
             myModal.show();
+        }
+
+        // ファイル選択時にトリミング画面を出す
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+                const file = files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    // 画像を表示してCropper起動
+                    const image = document.getElementById('cropImage');
+                    image.src = e.target.result;
+                    
+                    document.querySelector('.img-container').style.display = 'block';
+                    document.getElementById('cropMessage').classList.remove('d-none');
+
+                    // 以前のCropperがあれば破棄
+                    if (cropper) {
+                        cropper.destroy();
+                    }
+                    
+                    // Cropper初期化
+                    cropper = new Cropper(image, {
+                        aspectRatio: NaN, // 自由な比率（枠に合わせてトリミング）
+                        viewMode: 1,      // 画像枠からはみ出さない
+                        autoCropArea: 0.9 // 最初から90%を選択状態に
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // フォーム送信時の処理（ここがキモ！）
+        document.getElementById('editForm').addEventListener('submit', function(e) {
+            // Cropperが起動している場合のみ処理
+            if (cropper) {
+                e.preventDefault(); // 一旦送信を止める
+
+                // トリミング結果をCanvasとして取得
+                cropper.getCroppedCanvas({
+                    maxWidth: 1920, // 大きすぎないようにリサイズ
+                    maxHeight: 1080
+                }).toBlob((blob) => {
+                    // BlobをFileオブジェクトに変換
+                    const fileInput = document.getElementById('fileInput');
+                    // 元のファイル名を引き継ぐ
+                    const fileName = fileInput.files[0].name; 
+                    const newFile = new File([blob], fileName, { type: "image/jpeg" });
+
+                    // DataTransferを使ってinputの中身を差し替える！
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(newFile);
+                    fileInput.files = dataTransfer.files;
+
+                    // Cropperを片付けて、再送信しないようにフラグを消して、本当に送信
+                    resetCropper();
+                    
+                    // 再帰ループを防ぐために、このイベントリスナーをバイパスしてsubmit
+                    e.target.submit(); 
+                }, 'image/jpeg', 0.9);
+            }
+        });
+
+        function resetCropper() {
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            document.querySelector('.img-container').style.display = 'none';
+            document.getElementById('cropMessage').classList.add('d-none');
+            document.getElementById('cropImage').src = "";
         }
     </script>
 </body>
