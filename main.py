@@ -21,7 +21,7 @@ import database
 # ==========================================
 # ★設定: あなたのPCのIPアドレスに書き換え
 # ==========================================
-HOST_URL = "http://rebounder-signage.onrender.com"
+HOST_URL = "https://rebounder-signage.onrender.com"
 SECRET_KEY = "super-secret-key"
 
 app = FastAPI()
