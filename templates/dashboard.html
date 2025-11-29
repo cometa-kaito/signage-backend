@@ -48,7 +48,10 @@
             <div class="dashboard-slot slot-{{ item.slot.position }}" 
                  data-id="{{ item.slot.id }}"
                  data-type="{{ item.slot.content_type }}"
-                 data-body="{{ item.content.body or '' }}"
+                 data-body="{{ item.content.body if item.content else '' }}"
+                 data-theme="{{ item.content.theme if item.content else 'default' }}"
+                 data-start="{{ item.content.start_at.strftime('%Y-%m-%dT%H:%M') if item.content and item.content.start_at else '' }}"
+                 data-end="{{ item.content.end_at.strftime('%Y-%m-%dT%H:%M') if item.content and item.content.end_at else '' }}"
                  onclick="openEditModal(this)">
                 
                 <span class="slot-type-badge bg-{{ 'primary' if item.slot.content_type == 'notice' else 'warning' if item.slot.content_type == 'ad' else 'success' }}">
@@ -62,9 +65,9 @@
                         </div>
                     {% elif item.slot.content_type == 'weather' %}
                         <div class="text-white">天気予報<br>(自動配信)</div>
-                    {% elif item.content.media_url %}
+                    {% elif item.content and item.content.media_url %}
                         <img src="{{ item.content.media_url }}">
-                    {% elif item.content.body %}
+                    {% elif item.content and item.content.body %}
                         {{ item.content.body }}
                     {% else %}
                         <span class="text-muted">（未設定）</span>
@@ -96,6 +99,30 @@
                         </div>
 
                         <div id="formNotice" class="d-none">
+                            
+                            <div class="mb-3">
+                                <label class="form-label">デザインテーマ</label>
+                                <select name="theme" id="modalTheme" class="form-select">
+                                    <option value="default">通常（白背景）</option>
+                                    <option value="urgent">緊急（赤背景・白文字）</option>
+                                    <option value="info">インフォメーション（青背景）</option>
+                                    <option value="happy">お祝い（黄色背景）</option>
+                                </select>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label">表示開始日時</label>
+                                    <input type="datetime-local" name="start_at" id="modalStartAt" class="form-control">
+                                    <div class="form-text">空欄なら「今すぐ」</div>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">表示終了日時</label>
+                                    <input type="datetime-local" name="end_at" id="modalEndAt" class="form-control">
+                                    <div class="form-text">空欄なら「ずっと」</div>
+                                </div>
+                            </div>
+
                             <div class="mb-3">
                                 <label class="form-label">メッセージ本文</label>
                                 <textarea name="body" id="modalBody" class="form-control" rows="4"></textarea>
@@ -135,17 +162,26 @@
     <script>
         let cropper; // Cropperインスタンス保持用
 
-        // ★修正済み関数: 要素(this)を受け取ってデータを取得する
         function openEditModal(element) {
             // データ属性から値を取得
             const slotId = element.getAttribute('data-id');
             const contentType = element.getAttribute('data-type');
             const currentBody = element.getAttribute('data-body');
+            
+            // ★追加情報の取得
+            const theme = element.getAttribute('data-theme');
+            const start = element.getAttribute('data-start');
+            const end = element.getAttribute('data-end');
 
             // 取得した値をモーダルにセット
             document.getElementById('modalSlotId').value = slotId;
             document.getElementById('modalSlotType').innerText = contentType;
             
+            // ★フォームへのセット
+            document.getElementById('modalTheme').value = theme || 'default';
+            document.getElementById('modalStartAt').value = start;
+            document.getElementById('modalEndAt').value = end;
+
             const formNotice = document.getElementById('formNotice');
             const formAuto = document.getElementById('formAuto');
             const submitBtn = document.getElementById('submitBtn');

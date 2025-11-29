@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from starlette.middleware.sessions import SessionMiddleware
 from typing import List
+from datetime import datetime
 
 import models
 import database
@@ -131,6 +132,9 @@ def get_display_config(school_id: str, db: Session = Depends(get_db)):
     lat = 35.3912
     lon = 136.7223
 
+    # 現在時刻を取得
+    now = datetime.now()
+
     response_slots = []
     # position順に並べ替える
     slots = sorted(school.slots, key=lambda x: x.position)
@@ -166,17 +170,32 @@ def get_display_config(school_id: str, db: Session = Depends(get_db)):
             else:
                 slot_data["content"]["body"] = "広告募集中"
 
-        # Case 3: 教員投稿コンテンツ
+        # Case 3: 教員投稿コンテンツ (★ここを修正)
         else:
             content = db.query(models.Content).filter(models.Content.slot_id == slot.id).first()
             if content:
-                if content.body:
-                    slot_data["content"]["body"] = content.body
-                if content.media_url:
-                    if content.media_url.startswith("http"):
-                        slot_data["content"]["media_url"] = content.media_url
-                    else:
-                        slot_data["content"]["media_url"] = f"{HOST_URL}{content.media_url}"
+                # ★ A. 時間判定ロジック
+                # 開始時間が設定されていて、まだ来ていない -> 表示しない
+                if content.start_at and content.start_at > now:
+                    slot_data["content"]["body"] = "" # まだ空にしておく
+                
+                # 終了時間が設定されていて、もう過ぎた -> 表示しない
+                elif content.end_at and content.end_at < now:
+                    slot_data["content"]["body"] = "" # 期限切れ
+
+                else:
+                    # 表示OK
+                    if content.body:
+                        slot_data["content"]["body"] = content.body
+                    if content.media_url:
+                        # ... (URL生成ロジックはそのまま) ...
+                        if content.media_url.startswith("http"):
+                            slot_data["content"]["media_url"] = content.media_url
+                        else:
+                            slot_data["content"]["media_url"] = f"{HOST_URL}{content.media_url}"
+                    
+                    # ★ B. テーマ情報を渡す
+                    slot_data["content"]["theme"] = content.theme
 
         response_slots.append(slot_data)
     
@@ -231,6 +250,9 @@ async def update_content(
     slot_id: int = Form(...),
     body: str = Form(None),
     file: UploadFile = File(None),
+    start_at: str = Form(None), # HTMLフォームからは文字列で来る
+    end_at: str = Form(None),
+    theme: str = Form("default"),
     db: Session = Depends(get_db)
 ):
     user_id = request.session.get("user_id")
@@ -245,6 +267,21 @@ async def update_content(
     if body is not None:
         content.body = body
     
+    # ★ A. 日時保存
+    # HTMLの datetime-local は "YYYY-MM-DDTHH:MM" 形式で来るので変換
+    if start_at:
+        content.start_at = datetime.strptime(start_at, "%Y-%m-%dT%H:%M")
+    else:
+        content.start_at = None # 空ならクリア
+
+    if end_at:
+        content.end_at = datetime.strptime(end_at, "%Y-%m-%dT%H:%M")
+    else:
+        content.end_at = None
+
+    # ★ B. テーマ保存
+    content.theme = theme
+
     if file and file.filename:
         filename = f"slot_{slot_id}_{file.filename}"
         file_location = f"static/{filename}"

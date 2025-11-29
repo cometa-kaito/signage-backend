@@ -78,6 +78,14 @@ class Content(Base):
     is_active = Column(Boolean, default=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
+    # ★追加: A. 予約投稿用
+    start_at = Column(DateTime, nullable=True) # 開始日時 (Noneなら即時)
+    end_at = Column(DateTime, nullable=True)   # 終了日時 (Noneなら無期限)
+
+    # ★追加: B. デザインテンプレート用
+    # default, urgent(赤), happy(祝), info(青)
+    theme = Column(String, default="default") 
+
     # リレーション
     slot = relationship("Slot", back_populates="contents")
 
