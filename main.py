@@ -3,17 +3,15 @@ import shutil
 import random
 import httpx  # 天気取得用
 from pathlib import Path
-from fastapi import FastAPI, Depends, HTTPException, Request, Form, UploadFile, File, status
+from fastapi import FastAPI, Depends, HTTPException, Request, Form, UploadFile, File, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from starlette.middleware.sessions import SessionMiddleware
-
-from fastapi import WebSocket, WebSocketDisconnect
 from typing import List
-from fastapi.middleware.cors import CORSMiddleware
 
 import models
 import database
@@ -26,6 +24,7 @@ SECRET_KEY = "super-secret-key"
 
 app = FastAPI()
 
+# CORS設定 (ラズパイからの接続許可)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 「*」はすべての接続元を許可するという意味
@@ -33,8 +32,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # セッション管理
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -113,7 +110,6 @@ class ConnectionManager:
             try:
                 await connection.send_text(message)
             except:
-                # 切断されていたらリストから削除などの処理（簡易化のため省略）
                 pass
 
 manager = ConnectionManager()
@@ -164,7 +160,7 @@ def get_display_config(school_id: str, db: Session = Depends(get_db)):
                         full_url = f"{HOST_URL}{ad.media_url}"
                     ad_urls.append(full_url)
                 
-                # ★ここを変更: 単一のmedia_urlではなく、リストと表示時間を渡す
+                # ★リストと表示時間を渡す
                 slot_data["content"]["slideshow"] = ad_urls
                 slot_data["content"]["duration"] = 10000 # 切り替え間隔 (ミリ秒) = 10秒
             else:
@@ -258,9 +254,58 @@ async def update_content(
 
     db.commit()
 
+    # 教員の更新時もプッシュ通知を送る
     await manager.broadcast("RELOAD")
 
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
+# ----------------------------------------------
+# 3. 広告管理機能 (Super Admin)
+# ----------------------------------------------
+
+@app.get("/admin/ads", response_class=HTMLResponse)
+def admin_ads_page(request: Request, db: Session = Depends(get_db)):
+    # ログインチェック
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/")
+    
+    # 全広告を取得
+    ads = db.query(models.Ad).order_by(models.Ad.id.desc()).all()
+
+    return templates.TemplateResponse("admin_ads.html", {
+        "request": request,
+        "ads": ads
+    })
+
+@app.post("/admin/ads/update")
+async def update_ad_status(  # ★ここを async def に変更しました
+    request: Request,
+    ad_id: int = Form(...),
+    action: str = Form(...), # "approve" or "reject"
+    db: Session = Depends(get_db)
+):
+    # ログインチェック
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/")
+
+    ad = db.query(models.Ad).filter(models.Ad.id == ad_id).first()
+    if not ad:
+        raise HTTPException(status_code=404, detail="Ad not found")
+
+    # ステータス変更ロジック
+    if action == "approve":
+        ad.status = models.AdStatus.APPROVED
+    elif action == "reject":
+        ad.status = models.AdStatus.REJECTED
+    
+    db.commit()
+
+    # ★重要: ステータスが変わったので、全ラズパイに「更新しろ！」と伝える
+    await manager.broadcast("RELOAD")
+
+    return RedirectResponse(url="/admin/ads", status_code=status.HTTP_303_SEE_OTHER)
 
 # ==========================================
 # WebSocket エンドポイント (ラズパイ接続口)

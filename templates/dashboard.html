@@ -28,6 +28,9 @@
                 <strong>{{ school.name }}</strong> CMS
             </span>
             <div class="d-flex align-items-center">
+                <a href="/admin/ads" class="btn btn-warning btn-sm me-3 text-dark fw-bold">
+                    <i class="bi bi-shield-check"></i> 広告審査
+                </a>
                 <span class="text-light me-3">レイアウト: {{ slots_data|length }}分割</span>
                 <a href="/logout" class="btn btn-outline-light btn-sm">ログアウト</a>
             </div>
@@ -42,7 +45,10 @@
         <div id="preview-grid" class="layout-{{ slots_data|length }}">
             {% for item in slots_data %}
             <div class="dashboard-slot slot-{{ item.slot.position }}" 
-                 onclick="openEditModal('{{ item.slot.id }}', '{{ item.slot.content_type }}', '{{ item.content.body or '' }}')">
+                data-id="{{ item.slot.id }}"
+                data-type="{{ item.slot.content_type }}"
+                data-body="{{ item.content.body or '' }}"
+                onclick="openEditModal(this)">
                 
                 <span class="slot-type-badge bg-{{ 'primary' if item.slot.content_type == 'notice' else 'warning' if item.slot.content_type == 'ad' else 'success' }}">
                     {{ item.slot.content_type }}
@@ -128,6 +134,11 @@
         let cropper; // Cropperインスタンス保持用
 
         function openEditModal(slotId, contentType, currentBody) {
+            // データ属性から値を取得
+            const slotId = element.getAttribute('data-id');
+            const contentType = element.getAttribute('data-type');
+            const currentBody = element.getAttribute('data-body');
+
             document.getElementById('modalSlotId').value = slotId;
             document.getElementById('modalSlotType').innerText = contentType;
             
@@ -136,7 +147,7 @@
             const submitBtn = document.getElementById('submitBtn');
             const fileInput = document.getElementById('fileInput');
 
-            // フォームのリセット（重要）
+            // フォームのリセット
             fileInput.value = ''; 
             resetCropper(); 
 

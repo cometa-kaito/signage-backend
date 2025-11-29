@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>広告承認管理 - Super Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container">
+            <span class="navbar-brand">広告管理コンソール</span>
+            <div>
+                <a href="/dashboard" class="btn btn-outline-light btn-sm me-2">学校ダッシュボードへ</a>
+                <a href="/logout" class="btn btn-outline-light btn-sm">ログアウト</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2 class="mb-4">広告審査一覧</h2>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th style="width: 150px;">プレビュー</th>
+                            <th>広告タイトル / ターゲット</th>
+                            <th>現在の状態</th>
+                            <th>アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ad in ads %}
+                        <tr class="{{ 'table-warning' if ad.status == 'pending' else '' }}">
+                            <td>{{ ad.id }}</td>
+                            <td>
+                                {% if ad.media_url %}
+                                <img src="{{ ad.media_url }}" style="max-width: 120px; max-height: 80px; object-fit: contain;">
+                                {% else %}
+                                <span class="text-muted">No Image</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ ad.title or 'タイトル未設定' }}</strong><br>
+                                <small class="text-muted">エリア: {{ ad.target_area }}</small>
+                            </td>
+                            <td>
+                                {% if ad.status == 'pending' %}
+                                    <span class="badge bg-warning text-dark">審査待ち</span>
+                                {% elif ad.status == 'approved' %}
+                                    <span class="badge bg-success">配信中 (承認済)</span>
+                                {% else %}
+                                    <span class="badge bg-danger">却下</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form action="/admin/ads/update" method="post" class="d-flex gap-2">
+                                    <input type="hidden" name="ad_id" value="{{ ad.id }}">
+                                    
+                                    {% if ad.status != 'approved' %}
+                                    <button type="submit" name="action" value="approve" class="btn btn-success btn-sm">
+                                        承認する
+                                    </button>
+                                    {% endif %}
+
+                                    {% if ad.status != 'rejected' %}
+                                    <button type="submit" name="action" value="reject" class="btn btn-outline-danger btn-sm">
+                                        却下
+                                    </button>
+                                    {% endif %}
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
