@@ -1,12 +1,28 @@
+# Web Framework & Server
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
+
+# Database
 sqlalchemy>=2.0.0
+
+# Data Validation & Settings
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
+
+# Template Engine
 jinja2>=3.1.0
+
+# Form Data & File Uploads
 python-multipart>=0.0.9
+
+# Security (Password Hashing & Session)
 passlib[bcrypt]>=1.7.4
-bcrypt>=4.0.1
+# ★修正: 最新版(5.x)だとpasslibが動かないため4.0.1に固定
+bcrypt==4.0.1
 itsdangerous>=2.0.0
+
+# HTTP Client (for Weather API)
 httpx>=0.26.0
+
+# Environment Variables
 python-dotenv>=1.0.0
