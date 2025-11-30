@@ -1,273 +1,501 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <title>ダッシュボード - {{ school.name }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
-    <link href="/static/dashboard.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学校管理ダッシュボード</title>
+    <!-- Tailwind CSS & Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Flatpickr (Calendar) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
     
-    <style>
-        /* トリミング領域のスタイル */
-        .img-container {
-            max-height: 400px;
-            width: 100%;
-            background-color: #f7f7f7;
-            margin-bottom: 15px;
-            display: none; /* 初期は非表示 */
+    <style> 
+        body { font-family: 'Noto Sans JP', sans-serif; }
+        .aspect-video { aspect-ratio: 16 / 9; }
+        /* モーダルアニメーション */
+        dialog[open] {
+            animation: fadeIn 0.2s ease-out;
         }
-        .img-container img {
-            max-width: 100%;
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        /* カスタムスクロールバー */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
         }
     </style>
 </head>
-<body class="bg-light">
-
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-        <div class="container">
-            <span class="navbar-brand d-flex align-items-center">
-                <strong>{{ school.name }}</strong> CMS
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    
+    <!-- Header -->
+    <nav class="bg-slate-800 text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-tv text-blue-400 text-xl"></i>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">{{ school.name }}</h1>
+                    <p class="text-xs text-gray-400">デジタルサイネージ管理</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
                 
-                <span class="ms-3 badge rounded-pill {{ 'bg-success' if is_online else 'bg-danger' }}">
-                    {% if is_online %}
-                        <i class="bi bi-wifi"></i> 稼働中
-                    {% else %}
-                        <i class="bi bi-wifi-off"></i> 停止中
-                    {% endif %}
-                </span>
-                <span class="ms-2 text-white small" style="font-size: 0.7rem;">
-                    最終通信: {{ last_seen }}
-                </span>
-            </span>
-
-            <div class="d-flex align-items-center">
-                <a href="/admin/ads" class="btn btn-warning btn-sm me-3 text-dark fw-bold">
-                    <i class="bi bi-shield-check"></i> 広告審査
+                <!-- 広告管理ボタン -->
+                <a href="/admin/ads" class="flex items-center text-sm bg-yellow-600 hover:bg-yellow-700 px-3 py-1.5 rounded transition shadow-sm font-bold mr-2" title="広告の承認・停止">
+                    <i class="fa-solid fa-rectangle-ad mr-2"></i> 広告管理
                 </a>
 
-                <span class="text-light me-3">レイアウト: {{ slots_data|length }}分割</span>
-                <a href="/logout" class="btn btn-outline-light btn-sm">ログアウト</a>
+                <!-- 端末(ラズパイ)ステータス -->
+                <div class="hidden md:flex flex-col items-end mr-1 border-r border-gray-600 pr-4">
+                    <span class="text-[10px] text-gray-400 uppercase tracking-wider">Terminal</span>
+                    {% if is_online %}
+                    <div class="flex items-center text-green-400 font-bold text-xs" title="最終通信: {{ last_seen }}">
+                        <span class="w-2 h-2 rounded-full bg-green-500 mr-1.5 animate-pulse"></span> ONLINE
+                    </div>
+                    {% else %}
+                    <div class="flex items-center text-gray-400 font-bold text-xs" title="最終通信: {{ last_seen }}">
+                        <span class="w-2 h-2 rounded-full bg-gray-500 mr-1.5"></span> OFFLINE
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- サーバー(WebSocket)接続ステータス -->
+                <div class="hidden md:flex items-center bg-slate-700 rounded-full px-3 py-1" title="サーバー接続状態">
+                    <div id="connection-status" class="w-2 h-2 rounded-full bg-red-500 mr-2"></div>
+                    <span class="text-xs font-mono text-gray-300">SERVER</span>
+                </div>
+
+                <a href="/logout" class="bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded text-sm transition shadow-sm ml-2">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
             </div>
         </div>
     </nav>
 
-    <div class="dashboard-container">
-        <div class="text-center mb-3">
-            <p class="text-muted">編集したいエリアをクリックしてください</p>
+    <main class="flex-grow container mx-auto px-4 py-8 flex flex-col items-center">
+        
+        <!-- 説明文 -->
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">現在の配信内容</h2>
+            <p class="text-gray-500 text-sm">編集したい枠をクリックしてください。</p>
         </div>
 
-        <div id="preview-grid" class="layout-{{ slots_data|length }}">
-            {% for item in slots_data %}
-            <div class="dashboard-slot slot-{{ item.slot.position }} theme-{{ item.content.theme if item.content else 'default' }}" 
-                 data-id="{{ item.slot.id }}"
-                 data-type="{{ item.slot.content_type }}"
-                 data-body="{{ item.content.body if item.content else '' }}"
-                 data-theme="{{ item.content.theme if item.content else 'default' }}"
-                 data-start="{{ item.content.start_at.strftime('%Y-%m-%dT%H:%M') if item.content and item.content.start_at else '' }}"
-                 data-end="{{ item.content.end_at.strftime('%Y-%m-%dT%H:%M') if item.content and item.content.end_at else '' }}"
-                 onclick="openEditModal(this)">
+        <!-- Preview Container (TV Frame) -->
+        <div class="relative w-full max-w-5xl bg-gray-900 rounded-xl p-4 shadow-2xl border-b-8 border-gray-800">
+            <!-- Screen Area -->
+            <div class="bg-black w-full aspect-video rounded-lg overflow-hidden relative">
                 
-                <span class="slot-type-badge bg-{{ 'primary' if item.slot.content_type == 'notice' else 'warning' if item.slot.content_type == 'ad' else 'success' }}">
-                    {{ item.slot.content_type }}
-                </span>
-
-                <div class="slot-preview">
-                    {% if item.slot.content_type == 'ad' %}
-                        <div class="text-white">
-                            <i class="bi bi-collection-play"></i> スライドショー<br>(自動配信)
-                        </div>
-                    {% elif item.slot.content_type == 'weather' %}
-                        <div class="text-white">天気予報<br>(自動配信)</div>
-                    {% elif item.content and item.content.media_url %}
-                        <img src="{{ item.content.media_url }}">
-                    {% elif item.content and item.content.body %}
-                        {{ item.content.body }}
-                    {% else %}
-                        <span class="text-muted">（未設定）</span>
-                    {% endif %}
-                </div>
-
-                <div class="edit-overlay">
-                    <span class="edit-text">編集する</span>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <form id="editForm" action="/update_content" method="post" enctype="multipart/form-data">
-                    <div class="modal-header">
-                        <h5 class="modal-title">コンテンツ編集</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" name="slot_id" id="modalSlotId">
+                <!-- Grid Layout -->
+                <div class="w-full h-full grid gap-1 
+                            {% if school.layout_type == 1 %}grid-cols-1
+                            {% elif school.layout_type == 2 %}grid-cols-2
+                            {% elif school.layout_type == 3 %}grid-cols-3
+                            {% elif school.layout_type == 4 %}grid-cols-2 grid-rows-2
+                            {% else %}grid-cols-1{% endif %}">
+                    
+                    {% for item in slots_data %}
+                    {% set slot = item.slot %}
+                    {% set content = item.content %}
+                    
+                    <!-- Slot Item (Clickable) -->
+                    <div onclick="openModal('modal-{{ slot.id }}')" 
+                         class="relative bg-white group cursor-pointer overflow-hidden border-2 border-transparent hover:border-blue-500 transition-all duration-200">
                         
-                        <div class="mb-3">
-                            <label class="form-label">枠の種類:</label>
-                            <span id="modalSlotType" class="badge bg-secondary"></span>
-                        </div>
-
-                        <div id="formNotice" class="d-none">
+                        <!-- コンテンツプレビュー -->
+                        <div class="w-full h-full flex flex-col items-center justify-center p-4 text-center">
                             
-                            <div class="mb-3">
-                                <label class="form-label">デザインテーマ</label>
-                                <select name="theme" id="modalTheme" class="form-select">
-                                    <option value="default">通常（白背景）</option>
-                                    <option value="urgent">緊急（赤背景・白文字）</option>
-                                    <option value="info">インフォメーション（青背景）</option>
-                                    <option value="happy">お祝い（黄色背景）</option>
-                                </select>
+                            <!-- 背景画像がある場合 -->
+                            {% if content and content.media_url %}
+                            <img src="{{ content.media_url }}" class="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:scale-105 transition duration-500">
+                            <div class="absolute inset-0 bg-black bg-opacity-30 group-hover:bg-opacity-20 transition"></div>
+                            {% endif %}
+
+                            <!-- アイコンとラベル (前面) -->
+                            <div class="relative z-10 pointer-events-none">
+                                <!-- タイプ別アイコン -->
+                                <div class="text-4xl mb-2 drop-shadow-md text-white/90 group-hover:text-white transition group-hover:scale-110 duration-300">
+                                    {% if slot.content_type == 'notice' %}<i class="fa-solid fa-bullhorn text-orange-400"></i>
+                                    {% elif slot.content_type == 'weather' %}<i class="fa-solid fa-cloud-sun text-blue-400"></i>
+                                    {% elif slot.content_type == 'ad' %}<i class="fa-solid fa-rectangle-ad text-purple-400"></i>
+                                    {% elif slot.content_type == 'bus' %}<i class="fa-solid fa-bus text-green-400"></i>
+                                    {% elif slot.content_type == 'train' %}<i class="fa-solid fa-train text-green-400"></i>
+                                    {% elif slot.content_type == 'countdown' %}<i class="fa-solid fa-hourglass-half text-pink-400"></i>
+                                    {% elif slot.content_type == 'wbgt' %}<i class="fa-solid fa-temperature-high text-red-500"></i>
+                                    {% elif slot.content_type == 'emergency' %}<i class="fa-solid fa-triangle-exclamation text-red-600 animate-pulse"></i>
+                                    {% elif slot.content_type == 'club_result' %}<i class="fa-solid fa-trophy text-yellow-400"></i>
+                                    {% elif slot.content_type == 'lost_found' %}<i class="fa-solid fa-key text-gray-300"></i>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- テキスト抜粋 -->
+                                {% if content and content.body %}
+                                <p class="text-white font-bold text-shadow line-clamp-2 px-2 text-sm sm:text-base bg-black/50 rounded py-1 backdrop-blur-sm">
+                                    {{ content.body }}
+                                </p>
+                                {% endif %}
+                                
+                                <!-- 自動配信系のメッセージ -->
+                                {% if slot.content_type == 'weather' %}
+                                <p class="text-white text-xs mt-1 bg-black/40 px-2 rounded">自動更新</p>
+                                {% elif slot.content_type == 'ad' %}
+                                <p class="text-white text-xs mt-1 bg-black/40 px-2 rounded">スライドショー</p>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Hover Overlay -->
+                        <div class="absolute inset-0 bg-blue-600 bg-opacity-0 group-hover:bg-opacity-20 flex items-center justify-center transition-all duration-200">
+                            <span class="bg-white text-blue-600 px-4 py-2 rounded-full font-bold shadow-lg opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-200 text-sm">
+                                <i class="fa-solid fa-pen mr-1"></i> 編集する
+                            </span>
+                        </div>
+                        
+                        <!-- Badge -->
+                        <div class="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-md">
+                            枠 {{ slot.position + 1 }}
+                        </div>
+
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <!-- TV Stand decoration -->
+            <div class="absolute -bottom-6 left-1/2 transform -translate-x-1/2 w-1/3 h-6 bg-gray-800 rounded-b-lg shadow-md"></div>
+        </div>
+
+    </main>
+
+    <!-- Modals (Hidden by default) -->
+    {% for item in slots_data %}
+    {% set slot = item.slot %}
+    {% set content = item.content %}
+    
+    <dialog id="modal-{{ slot.id }}" class="p-0 rounded-xl shadow-2xl w-full max-w-lg backdrop:bg-gray-900/50">
+        <div class="bg-white rounded-xl overflow-hidden max-h-[90vh] flex flex-col">
+            <!-- Modal Header -->
+            <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center shrink-0">
+                <h3 class="font-bold text-lg flex items-center">
+                    <span class="bg-blue-500 text-xs px-2 py-1 rounded mr-3 shadow">枠 {{ slot.position + 1 }}</span>
+                    {% if slot.content_type == 'notice' %}お知らせ
+                    {% elif slot.content_type == 'weather' %}天気予報
+                    {% elif slot.content_type == 'ad' %}広告
+                    {% elif slot.content_type == 'bus' %}バス時刻表
+                    {% elif slot.content_type == 'train' %}電車時刻表
+                    {% elif slot.content_type == 'countdown' %}カウントダウン
+                    {% elif slot.content_type == 'wbgt' %}熱中症情報
+                    {% elif slot.content_type == 'emergency' %}緊急連絡
+                    {% elif slot.content_type == 'club_result' %}部活動
+                    {% elif slot.content_type == 'lost_found' %}落とし物
+                    {% endif %}
+                </h3>
+                <button onclick="closeModal('modal-{{ slot.id }}')" class="text-gray-400 hover:text-white transition text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-6 overflow-y-auto custom-scrollbar">
+                <!-- 自動コンテンツの場合 -->
+                {% if slot.content_type in ['weather', 'ad'] %}
+                    <div class="text-center py-10 flex flex-col items-center">
+                        <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-300">
+                            <i class="fa-solid fa-robot text-4xl"></i>
+                        </div>
+                        <p class="text-gray-800 font-bold text-lg">システムによる自動配信枠</p>
+                        <p class="text-sm text-gray-500 mt-2 max-w-xs">この枠の内容は、外部データ（天気APIや広告申請）に基づいて自動的に更新されます。</p>
+                        
+                        {% if slot.content_type == 'ad' %}
+                        <div class="mt-6 w-full max-w-xs">
+                             <a href="/admin/ads" class="block w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2.5 px-4 rounded-lg shadow transition text-center text-sm">
+                                <i class="fa-solid fa-rectangle-ad mr-2"></i> 広告管理ページへ
+                             </a>
+                             <p class="text-xs text-gray-400 mt-2">広告の承認や停止はこちらから行えます</p>
+                        </div>
+                        {% endif %}
+
+                        <button onclick="closeModal('modal-{{ slot.id }}')" class="mt-8 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2.5 px-8 rounded-full transition">
+                            閉じる
+                        </button>
+                    </div>
+
+                {% else %}
+                    <!-- 編集フォーム -->
+                    <form action="/update_content" method="post" enctype="multipart/form-data" class="space-y-6">
+                        <input type="hidden" name="slot_id" value="{{ slot.id }}">
+
+                        <!-- コンテンツ別フォーム -->
+                        {% if slot.content_type in ['bus', 'train'] %}
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">
+                                    <i class="fa-regular fa-image mr-1"></i>時刻表の写真
+                                </label>
+                                <!-- Custom File Upload -->
+                                <div class="relative group">
+                                    <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-blue-50 hover:border-blue-400 transition cursor-pointer bg-gray-50" onclick="document.getElementById('file-{{ slot.id }}').click()">
+                                        <input type="file" id="file-{{ slot.id }}" name="file" accept="image/*" class="hidden" onchange="previewImage(this, 'preview-{{ slot.id }}')">
+                                        
+                                        <!-- Preview Area -->
+                                        <div id="preview-{{ slot.id }}" class="mt-2 {% if not (content and content.media_url) %}hidden{% endif %}">
+                                            <img src="{{ content.media_url if content else '' }}" class="max-h-48 mx-auto rounded shadow-sm">
+                                            <p class="text-xs text-green-600 font-bold mt-2"><i class="fa-solid fa-check mr-1"></i>画像が選択されています</p>
+                                        </div>
+                                        
+                                        <div class="{% if content and content.media_url %}hidden{% endif %} preview-placeholder">
+                                            <i class="fa-solid fa-camera text-3xl text-gray-400 mb-2 group-hover:text-blue-500 transition"></i>
+                                            <p class="text-sm text-gray-500 group-hover:text-blue-600 font-medium">クリックして写真をアップロード</p>
+                                            <p class="text-xs text-gray-400 mt-1">またはドラッグ＆ドロップ</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">
+                                    <i class="fa-solid fa-pen mr-1"></i>メモ (任意)
+                                </label>
+                                <input type="text" name="body" value="{{ content.body if content else '' }}" placeholder="例: 平日ダイヤ改正版" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
                             </div>
 
-                            <div class="row mb-3">
-                                <div class="col-6">
-                                    <label class="form-label">表示開始日時</label>
-                                    <input type="datetime-local" name="start_at" id="modalStartAt" class="form-control">
-                                    <div class="form-text">空欄なら「今すぐ」</div>
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label">表示終了日時</label>
-                                    <input type="datetime-local" name="end_at" id="modalEndAt" class="form-control">
-                                    <div class="form-text">空欄なら「ずっと」</div>
+                        {% elif slot.content_type == 'countdown' %}
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">イベント名</label>
+                                <input type="text" name="body" value="{{ content.body if content else '' }}" placeholder="例: 体育祭まで" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none transition font-bold" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">ターゲット日時</label>
+                                <div class="relative">
+                                    <input type="text" name="end_at" 
+                                           class="flatpickr w-full bg-gray-50 border border-gray-300 rounded-lg p-3 pl-10 focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer" 
+                                           placeholder="日付を選択してください"
+                                           data-default-date="{{ content.end_at.strftime('%Y-%m-%d %H:%M') if content and content.end_at else '' }}"
+                                           required>
+                                    <i class="fa-regular fa-calendar absolute left-3 top-3.5 text-gray-400 pointer-events-none"></i>
                                 </div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">メッセージ本文</label>
-                                <textarea name="body" id="modalBody" class="form-control" rows="4"></textarea>
+                        {% elif slot.content_type == 'wbgt' %}
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-3">現在の危険度を選択</label>
+                                <div class="grid grid-cols-1 gap-3">
+                                    <label class="cursor-pointer relative">
+                                        <input type="radio" name="body" value="safe" class="peer sr-only" {% if content and content.body == 'safe' %}checked{% endif %}>
+                                        <div class="p-4 rounded-xl border-2 border-gray-200 hover:bg-blue-50 peer-checked:border-blue-500 peer-checked:bg-blue-50 transition flex items-center">
+                                            <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 text-xl">
+                                                <i class="fa-regular fa-face-smile"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-bold text-gray-800">安全 / 注意なし</div>
+                                                <div class="text-xs text-gray-500">通常通り活動できます</div>
+                                            </div>
+                                            <i class="fa-solid fa-circle-check text-blue-500 text-xl ml-auto opacity-0 peer-checked:opacity-100 transition"></i>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="cursor-pointer relative">
+                                        <input type="radio" name="body" value="warning" class="peer sr-only" {% if content and content.body == 'warning' %}checked{% endif %}>
+                                        <div class="p-4 rounded-xl border-2 border-gray-200 hover:bg-yellow-50 peer-checked:border-yellow-500 peer-checked:bg-yellow-50 transition flex items-center">
+                                            <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center mr-3 text-xl">
+                                                <i class="fa-regular fa-face-flushed"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-bold text-gray-800">警戒 (休憩推奨)</div>
+                                                <div class="text-xs text-gray-500">こまめな水分補給が必要です</div>
+                                            </div>
+                                            <i class="fa-solid fa-circle-check text-yellow-500 text-xl ml-auto opacity-0 peer-checked:opacity-100 transition"></i>
+                                        </div>
+                                    </label>
+
+                                    <label class="cursor-pointer relative">
+                                        <input type="radio" name="body" value="danger" class="peer sr-only" {% if content and content.body == 'danger' %}checked{% endif %}>
+                                        <div class="p-4 rounded-xl border-2 border-gray-200 hover:bg-red-50 peer-checked:border-red-500 peer-checked:bg-red-50 transition flex items-center">
+                                            <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center mr-3 text-xl">
+                                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-bold text-gray-800">危険 (運動中止)</div>
+                                                <div class="text-xs text-gray-500">屋外活動を直ちに中止してください</div>
+                                            </div>
+                                            <i class="fa-solid fa-circle-check text-red-500 text-xl ml-auto opacity-0 peer-checked:opacity-100 transition"></i>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                        {% elif slot.content_type == 'emergency' %}
+                            <div>
+                                <label class="block text-sm font-bold text-red-600 mb-2">
+                                    <i class="fa-solid fa-triangle-exclamation mr-1"></i>緊急メッセージ
+                                </label>
+                                <div class="relative">
+                                    <textarea name="body" rows="4" placeholder="ここに避難指示などを入力してください" class="w-full border-2 border-red-300 rounded-xl p-4 text-lg font-bold text-gray-800 focus:ring-4 focus:ring-red-100 focus:border-red-500 outline-none transition" required>{{ content.body if content else '' }}</textarea>
+                                    <div class="absolute bottom-3 right-3 text-red-300 text-xs">全画面に赤色で表示されます</div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="theme" value="urgent">
+
+                        {% else %}
+                            <!-- Standard Form (Notice, Club, Lost&Found) -->
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">
+                                    <i class="fa-solid fa-pen-nib mr-1"></i>テキスト本文
+                                </label>
+                                <textarea name="body" rows="4" placeholder="お知らせ内容を入力..." class="w-full bg-gray-50 border border-gray-300 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">{{ content.body if content else '' }}</textarea>
                             </div>
                             
-                            <div class="mb-3">
-                                <label class="form-label">画像アップロード</label>
-                                <input type="file" name="file" id="fileInput" class="form-control" accept="image/*">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">
+                                    <i class="fa-regular fa-image mr-1"></i>画像 (任意)
+                                </label>
+                                <div class="relative group">
+                                    <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-blue-50 hover:border-blue-400 transition cursor-pointer bg-gray-50" onclick="document.getElementById('file-{{ slot.id }}').click()">
+                                        <input type="file" id="file-{{ slot.id }}" name="file" accept="image/*" class="hidden" onchange="previewImage(this, 'preview-{{ slot.id }}')">
+                                        
+                                        <div id="preview-{{ slot.id }}" class="{% if not (content and content.media_url) %}hidden{% endif %}">
+                                            <img src="{{ content.media_url if content else '' }}" class="h-32 mx-auto rounded object-cover shadow-sm">
+                                            <p class="text-xs text-green-600 font-bold mt-2">選択済み</p>
+                                        </div>
+                                        
+                                        <div class="{% if content and content.media_url %}hidden{% endif %} preview-placeholder flex flex-col items-center py-2">
+                                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-400 mb-1 group-hover:text-blue-500 transition"></i>
+                                            <span class="text-xs text-gray-500 font-bold group-hover:text-blue-600">画像を選択</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                        {% endif %}
 
-                            <div class="img-container">
-                                <img id="cropImage" src="">
-                            </div>
-                            <div id="cropMessage" class="form-text text-primary d-none">
-                                ※四隅をドラッグして、表示したい範囲を指定してください。
-                            </div>
+                        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                            <button type="button" onclick="closeModal('modal-{{ slot.id }}')" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-2.5 px-5 rounded-lg transition text-sm">
+                                キャンセル
+                            </button>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-8 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 text-sm flex items-center">
+                                <i class="fa-solid fa-paper-plane mr-2"></i> 保存して配信
+                            </button>
                         </div>
-
-                        <div id="formAuto" class="d-none">
-                            <div class="alert alert-info">
-                                この枠はシステムまたは広告主によって自動配信されています。
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                        <button type="submit" id="submitBtn" class="btn btn-primary">更新して反映</button>
-                    </div>
-                </form>
+                    </form>
+                {% endif %}
             </div>
         </div>
-    </div>
+    </dialog>
+    {% endfor %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <!-- Footer -->
+    <footer class="mt-auto py-6 text-center text-xs text-gray-400">
+        &copy; Signage System Panel
+    </footer>
 
+    <!-- WebSocket & Modal Script -->
     <script>
-        let cropper; // Cropperインスタンス保持用
-
-        function openEditModal(element) {
-            const slotId = element.getAttribute('data-id');
-            const contentType = element.getAttribute('data-type');
-            const currentBody = element.getAttribute('data-body');
-            const theme = element.getAttribute('data-theme');
-            const start = element.getAttribute('data-start');
-            const end = element.getAttribute('data-end');
-
-            document.getElementById('modalSlotId').value = slotId;
-            document.getElementById('modalSlotType').innerText = contentType;
+        // --- Flatpickr (Calendar) Init ---
+        document.addEventListener('DOMContentLoaded', function() {
+            flatpickr(".flatpickr", {
+                enableTime: true,
+                dateFormat: "Y-m-d H:i",
+                locale: "ja",
+                time_24hr: true
+            });
             
-            document.getElementById('modalTheme').value = theme || 'default';
-            document.getElementById('modalStartAt').value = start;
-            document.getElementById('modalEndAt').value = end;
+            // Set default dates from data attribute
+            document.querySelectorAll('.flatpickr').forEach(el => {
+                if (el.dataset.defaultDate) {
+                    el._flatpickr.setDate(el.dataset.defaultDate);
+                }
+            });
+        });
 
-            const formNotice = document.getElementById('formNotice');
-            const formAuto = document.getElementById('formAuto');
-            const submitBtn = document.getElementById('submitBtn');
-            const fileInput = document.getElementById('fileInput');
-
-            fileInput.value = ''; 
-            resetCropper(); 
-
-            if (contentType === 'notice') {
-                formNotice.classList.remove('d-none');
-                formAuto.classList.add('d-none');
-                submitBtn.disabled = false;
-                document.getElementById('modalBody').value = currentBody;
-            } else {
-                formNotice.classList.add('d-none');
-                formAuto.classList.remove('d-none');
-                submitBtn.disabled = true;
-            }
-
-            var myModal = new bootstrap.Modal(document.getElementById('editModal'));
-            myModal.show();
-        }
-
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const files = e.target.files;
-            if (files && files.length > 0) {
-                const file = files[0];
+        // --- Image Preview Logic ---
+        function previewImage(input, previewId) {
+            const previewContainer = document.getElementById(previewId);
+            const placeholder = input.parentElement.querySelector('.preview-placeholder');
+            
+            if (input.files && input.files[0]) {
                 const reader = new FileReader();
-                
                 reader.onload = function(e) {
-                    const image = document.getElementById('cropImage');
-                    image.src = e.target.result;
-                    document.querySelector('.img-container').style.display = 'block';
-                    document.getElementById('cropMessage').classList.remove('d-none');
-
-                    if (cropper) {
-                        cropper.destroy();
+                    // Create or update img tag
+                    let img = previewContainer.querySelector('img');
+                    if (!img) {
+                        img = document.createElement('img');
+                        img.className = "max-h-48 mx-auto rounded shadow-sm";
+                        previewContainer.insertBefore(img, previewContainer.firstChild);
                     }
-                    cropper = new Cropper(image, {
-                        aspectRatio: NaN,
-                        viewMode: 1,
-                        autoCropArea: 0.9
-                    });
-                };
-                reader.readAsDataURL(file);
+                    img.src = e.target.result;
+                    
+                    previewContainer.classList.remove('hidden');
+                    if(placeholder) placeholder.classList.add('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
             }
-        });
-
-        document.getElementById('editForm').addEventListener('submit', function(e) {
-            if (cropper) {
-                e.preventDefault(); 
-                cropper.getCroppedCanvas({
-                    maxWidth: 1920, 
-                    maxHeight: 1080
-                }).toBlob((blob) => {
-                    const fileInput = document.getElementById('fileInput');
-                    const fileName = fileInput.files[0].name; 
-                    const newFile = new File([blob], fileName, { type: "image/jpeg" });
-
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(newFile);
-                    fileInput.files = dataTransfer.files;
-
-                    resetCropper();
-                    e.target.submit(); 
-                }, 'image/jpeg', 0.9);
-            }
-        });
-
-        function resetCropper() {
-            if (cropper) {
-                cropper.destroy();
-                cropper = null;
-            }
-            document.querySelector('.img-container').style.display = 'none';
-            document.getElementById('cropMessage').classList.add('d-none');
-            document.getElementById('cropImage').src = "";
         }
+
+        // --- Modal Control ---
+        function openModal(id) {
+            document.getElementById(id).showModal();
+        }
+        function closeModal(id) {
+            const dialog = document.getElementById(id);
+            dialog.classList.add('closing'); // Animation hook if needed
+            dialog.close();
+        }
+
+        // Close modal when clicking outside
+        document.querySelectorAll('dialog').forEach(dialog => {
+            dialog.addEventListener('click', (event) => {
+                if (event.target === dialog) {
+                    dialog.close();
+                }
+            });
+        });
+
+        // --- WebSocket for Auto Reload ---
+        const schoolId = "{{ school.id }}";
+        const statusDot = document.getElementById('connection-status');
+        
+        function connectWs() {
+            // Check protocol
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/${schoolId}`;
+            const ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log("WS Connected");
+                statusDot.classList.remove('bg-red-500');
+                statusDot.classList.add('bg-green-500', 'animate-pulse');
+            };
+
+            ws.onmessage = (event) => {
+                console.log("Message:", event.data);
+                if (event.data === "RELOAD") {
+                    location.reload();
+                }
+            };
+
+            ws.onclose = () => {
+                console.log("WS Disconnected");
+                statusDot.classList.remove('bg-green-500', 'animate-pulse');
+                statusDot.classList.add('bg-red-500');
+                // Reconnect after 5s
+                setTimeout(connectWs, 5000);
+            };
+        }
+
+        connectWs();
     </script>
 </body>
 </html>

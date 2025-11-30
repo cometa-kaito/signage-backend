@@ -1,23 +1,86 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <title>ログイン - School Signage</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン | Signage System</title>
+    <!-- Tailwind CSS & Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style> body { font-family: 'Noto Sans JP', sans-serif; } </style>
 </head>
-<body class="bg-light d-flex align-items-center justify-content-center" style="height: 100vh;">
-    <div class="card p-4 shadow-sm" style="width: 350px;">
-        <h3 class="text-center mb-4">先生用ログイン</h3>
-        <form action="/login" method="post">
-            <div class="mb-3">
-                <label>ユーザーID</label>
-                <input type="text" name="username" class="form-control" required>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+        <!-- Header -->
+        <div class="bg-slate-800 p-8 text-center">
+            <i class="fa-solid fa-school text-blue-400 text-5xl mb-4"></i>
+            <h1 class="text-2xl font-bold text-white">Signage System</h1>
+            <p class="text-slate-400 text-sm mt-2">学校デジタルサイネージ管理</p>
+        </div>
+
+        <div class="p-8">
+            <!-- Error Message -->
+            {% if error %}
+            <div class="mb-6 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded text-sm flex items-start animate-pulse">
+                <i class="fa-solid fa-circle-exclamation mr-2 mt-0.5"></i>
+                <span>{{ error }}</span>
             </div>
-            <div class="mb-3">
-                <label>パスワード</label>
-                <input type="password" name="password" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">ログイン</button>
-        </form>
+            {% endif %}
+
+            <form action="/login" method="post" class="space-y-5">
+                
+                <!-- School ID -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2 ml-1">
+                        学校ID <span class="text-xs font-normal text-gray-500">(管理者から配布されたID)</span>
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-building text-gray-400"></i>
+                        </div>
+                        <input type="text" name="school_id" placeholder="例: test-school-001" 
+                               class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-gray-700 bg-gray-50 focus:bg-white" required>
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-1 ml-1">※システム管理者は任意の文字を入力してください</p>
+                </div>
+
+                <!-- Username -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2 ml-1">ユーザーID</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-user text-gray-400"></i>
+                        </div>
+                        <input type="text" name="username" placeholder="ユーザー名" 
+                               class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-gray-700 bg-gray-50 focus:bg-white" required>
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2 ml-1">パスワード</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-lock text-gray-400"></i>
+                        </div>
+                        <input type="password" name="password" placeholder="パスワード" 
+                               class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-gray-700 bg-gray-50 focus:bg-white" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 flex justify-center items-center mt-4">
+                    ログイン <i class="fa-solid fa-arrow-right-to-bracket ml-2"></i>
+                </button>
+            </form>
+        </div>
+        
+        <div class="bg-gray-50 px-8 py-4 border-t border-gray-100 text-center flex justify-between items-center text-xs text-gray-500">
+            <span>&copy; Signage System</span>
+            <a href="/portal/login" class="text-blue-500 hover:underline">広告主用ポータルはこちら</a>
+        </div>
     </div>
+
 </body>
 </html>

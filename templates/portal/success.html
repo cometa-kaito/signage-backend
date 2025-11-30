@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>送信完了</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style> body { font-family: 'Noto Sans JP', sans-serif; } </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center transform transition-all scale-100">
+        
+        <div class="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-green-100 mb-6 animate-bounce">
+            <i class="fa-solid fa-check text-green-600 text-3xl"></i>
+        </div>
+        
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">申請を受け付けました</h1>
+        
+        <p class="text-gray-500 mb-8 leading-relaxed text-sm">
+            広告データの送信ありがとうございます。<br>
+            管理者による審査完了後、順次配信が開始されます。<br>
+            ブラウザを閉じて終了してください。
+        </p>
+        
+        <div class="space-y-3">
+            <a href="/portal/login" class="block w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 rounded-lg transition duration-200">
+                <i class="fa-solid fa-arrow-left mr-2"></i> ログイン画面に戻る
+            </a>
+        </div>
+        
+        <div class="mt-8 pt-6 border-t border-gray-100">
+            <p class="text-xs text-gray-400">Signage System Portal</p>
+        </div>
+    </div>
+
+</body>
+</html>

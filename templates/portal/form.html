@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>広告データ登録</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style> body { font-family: 'Noto Sans JP', sans-serif; } </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    
+    <!-- Navbar -->
+    <header class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center text-blue-800 font-bold text-lg">
+                <i class="fa-solid fa-cloud-upload-alt mr-2"></i> Portal
+            </div>
+            <div class="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                <i class="fa-solid fa-user-tag mr-1"></i> Guest Mode
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto max-w-3xl px-4 py-8">
+        
+        <!-- School Info Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 flex items-center justify-between bg-gradient-to-r from-white to-blue-50">
+            <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1">掲載申し込み先</p>
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                    {{ school.name }}
+                    <span class="ml-3 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded border border-blue-200">ID: {{ school.id }}</span>
+                </h2>
+            </div>
+            <div class="hidden sm:block">
+                <i class="fa-solid fa-school text-blue-200 text-6xl"></i>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="bg-slate-800 p-6 text-white border-b border-slate-700">
+                <h1 class="text-xl font-bold flex items-center">
+                    <i class="fa-solid fa-pen-to-square mr-3"></i> 広告データ登録
+                </h1>
+                <p class="text-slate-300 text-sm mt-1 ml-8">
+                    以下のフォームに入力し、広告画像をアップロードしてください。
+                </p>
+            </div>
+            
+            <div class="p-8">
+                {% if error %}
+                <div class="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded mb-6 flex items-center">
+                    <i class="fa-solid fa-circle-exclamation mr-2"></i>
+                    {{ error }}
+                </div>
+                {% endif %}
+
+                <form action="/portal/submit" method="post" enctype="multipart/form-data" class="space-y-8">
+                    
+                    <!-- Applicant Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="col-span-1 md:col-span-2">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                申請者名 <span class="text-red-500 text-xs font-normal">(必須)</span>
+                            </label>
+                            <input type="text" name="applicant_name" 
+                                   class="w-full border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-gray-50 focus:bg-white" 
+                                   placeholder="例: 株式会社サンプル 広告担当" required>
+                            <p class="text-xs text-gray-400 mt-1">企業名または担当者名を入力してください。</p>
+                        </div>
+
+                        <div class="col-span-1 md:col-span-2">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                広告タイトル <span class="text-red-500 text-xs font-normal">(必須)</span>
+                            </label>
+                            <input type="text" name="title" 
+                                   class="w-full border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-gray-50 focus:bg-white" 
+                                   placeholder="例: 春の学習応援キャンペーン" required>
+                        </div>
+                    </div>
+
+                    <!-- File Upload -->
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">
+                            広告画像 <span class="text-red-500 text-xs font-normal">(必須)</span>
+                        </label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-blue-50 hover:border-blue-400 transition cursor-pointer relative group">
+                            <input type="file" name="file" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" required>
+                            
+                            <div class="text-gray-400 group-hover:text-blue-500 transition">
+                                <i class="fa-solid fa-image text-4xl mb-3"></i>
+                                <p class="text-sm font-medium text-gray-600">クリックして画像を選択</p>
+                                <p class="text-xs text-gray-400 mt-1">推奨: 1920x1080px (JPG, PNG)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notice -->
+                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-4 flex items-start">
+                        <i class="fa-solid fa-info-circle text-blue-500 mt-0.5 mr-3"></i>
+                        <div class="text-sm text-blue-800">
+                            <p class="font-bold">申請後の流れ</p>
+                            <p class="opacity-80 mt-1">
+                                送信後、管理者による内容確認が行われます。承認されると自動的にサイネージへ配信されます。
+                            </p>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 text-lg flex justify-center items-center">
+                        <i class="fa-solid fa-paper-plane mr-2"></i> 申請を送信する
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

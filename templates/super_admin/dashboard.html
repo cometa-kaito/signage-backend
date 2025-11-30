@@ -1,0 +1,172 @@
+{% extends "layout_admin.html" %}
+
+{% block title %}システム管理{% endblock %}
+
+{% block content %}
+    <!-- Flash Message (Token) -->
+    {% if created_token %}
+    <div class="mb-8 bg-green-50 border-l-4 border-green-500 p-4 rounded shadow-md animate-fade-in-down">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <i class="fa-solid fa-circle-check text-green-500 text-xl"></i>
+            </div>
+            <div class="ml-3 w-full">
+                <p class="text-sm font-bold text-green-800">トークンを発行しました</p>
+                <p class="text-sm text-green-700 mt-1">以下のトークンをコピーして広告主に共有してください。</p>
+                <div class="mt-3 relative">
+                    <input type="text" value="{{ created_token }}" readonly 
+                           class="w-full bg-white border border-green-300 text-gray-700 text-sm rounded-lg p-3 pr-10 focus:outline-none font-mono"
+                           onclick="this.select();">
+                    <i class="fa-regular fa-copy absolute right-3 top-3.5 text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Column: School Status (lg:col-span-8) -->
+        <div class="lg:col-span-7 xl:col-span-8 space-y-8">
+            
+            <!-- Status Table Card -->
+            <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
+                <div class="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-gray-700 flex items-center">
+                        <i class="fa-solid fa-school text-indigo-500 mr-2"></i> 学校稼働状況
+                    </h2>
+                    <span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-medium">
+                        全 {{ school_status|length }} 校
+                    </span>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left whitespace-nowrap">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                <th class="px-6 py-3 font-medium">学校名</th>
+                                <th class="px-6 py-3 font-medium">ID</th>
+                                <th class="px-6 py-3 font-medium text-center">ステータス</th>
+                                <th class="px-6 py-3 font-medium text-right">最終通信</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 text-sm">
+                            {% for status in school_status %}
+                            <tr class="hover:bg-gray-50 transition duration-150">
+                                <td class="px-6 py-4 font-medium text-gray-800">{{ status.school.name }}</td>
+                                <td class="px-6 py-4 text-gray-500 font-mono text-xs">{{ status.school.id }}</td>
+                                <td class="px-6 py-4 text-center">
+                                    {% if status.is_online %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <span class="w-2 h-2 bg-green-500 rounded-full mr-1.5"></span> Online
+                                    </span>
+                                    {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        <span class="w-2 h-2 bg-red-500 rounded-full mr-1.5"></span> Offline
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 text-right text-gray-500">
+                                    {% if status.last_heartbeat %}
+                                        {{ status.last_heartbeat.strftime('%m/%d %H:%M') }}
+                                    {% else %}
+                                        <span class="text-gray-300">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if not school_status %}
+                            <tr>
+                                <td colspan="4" class="px-6 py-8 text-center text-gray-400">
+                                    データがありません
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add School Form -->
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <h3 class="text-md font-bold text-gray-700 mb-4 flex items-center">
+                    <i class="fa-solid fa-plus-circle text-blue-500 mr-2"></i> 新規学校登録
+                </h3>
+                <form action="/super_admin/schools/create" method="post" class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-1">
+                        <input type="text" name="school_id" placeholder="学校ID (例: gifu-n-01)" 
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition text-sm" required>
+                    </div>
+                    <div class="flex-1">
+                        <input type="text" name="name" placeholder="学校名 (例: 岐阜北高校)" 
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition text-sm" required>
+                    </div>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition shadow-md whitespace-nowrap">
+                        <i class="fa-solid fa-save mr-1"></i> 追加
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Token Management (lg:col-span-4) -->
+        <div class="lg:col-span-5 xl:col-span-4 space-y-6">
+            
+            <!-- Token Generator Card -->
+            <div class="bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-lg p-6 text-white">
+                <h2 class="text-lg font-bold mb-1 flex items-center">
+                    <i class="fa-solid fa-key text-yellow-400 mr-2"></i> トークン発行
+                </h2>
+                <p class="text-slate-300 text-xs mb-6">広告主に渡す招待コードを生成します。</p>
+                
+                <form action="/super_admin/tokens/generate" method="post" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">対象の学校</label>
+                        <div class="relative">
+                            <select name="school_id" class="w-full bg-slate-600 border border-slate-500 text-white text-sm rounded-lg p-2.5 appearance-none focus:ring-2 focus:ring-blue-400 outline-none cursor-pointer" required>
+                                {% for status in school_status %}
+                                <option value="{{ status.school.id }}">{{ status.school.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-300">
+                                <i class="fa-solid fa-chevron-down text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">有効期限 (日)</label>
+                        <input type="number" name="days_valid" value="30" min="1" 
+                               class="w-full bg-slate-600 border border-slate-500 text-white text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-blue-400 outline-none">
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold py-3 rounded-lg shadow-lg transition duration-300 mt-2 flex justify-center items-center">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> トークンを発行
+                    </button>
+                </form>
+            </div>
+
+            <!-- Token History -->
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <h3 class="text-sm font-bold text-gray-700 mb-4 border-b pb-2">発行履歴 (最新5件)</h3>
+                <div class="space-y-4">
+                    {% for t in tokens[:5] %}
+                    <div class="flex flex-col">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-gray-700">{{ t.target_school.name }}</span>
+                            <span class="text-[10px] text-gray-400">{{ t.created_at.strftime('%Y/%m/%d') }}</span>
+                        </div>
+                        <div class="bg-gray-50 rounded p-2 border border-gray-200 flex justify-between items-center group cursor-pointer" title="クリックでコピー">
+                            <code class="text-xs text-gray-600 font-mono truncate mr-2 select-all">{{ t.token }}</code>
+                            <i class="fa-regular fa-copy text-gray-400 text-xs group-hover:text-blue-500"></i>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-xs text-gray-400 text-center py-4">履歴はありません</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+{% endblock %}

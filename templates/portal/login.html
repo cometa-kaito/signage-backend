@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>広告掲載申請 | ログイン</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+    
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all hover:scale-[1.01] duration-300">
+        <!-- Header Image Area -->
+        <div class="bg-blue-600 p-8 text-center relative overflow-hidden">
+            <div class="absolute inset-0 bg-pattern opacity-10"></div> <!-- Pattern placeholder -->
+            <i class="fa-solid fa-rectangle-ad text-white text-5xl mb-4 relative z-10"></i>
+            <h1 class="text-2xl font-bold text-white relative z-10">広告掲載申請ポータル</h1>
+            <p class="text-blue-100 text-sm mt-2 relative z-10">学校サイネージへの掲載申し込み</p>
+        </div>
+
+        <div class="p-8">
+            {% if error %}
+            <div class="mb-6 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded text-sm flex items-start animate-pulse">
+                <i class="fa-solid fa-triangle-exclamation mr-2 mt-0.5"></i>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <form action="/portal/login" method="post" class="space-y-6">
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2 ml-1" for="token">
+                        招待トークン
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-key text-gray-400"></i>
+                        </div>
+                        <input type="text" name="token" id="token" placeholder="管理者から受け取ったコードを入力" 
+                               class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 text-gray-700 bg-gray-50 focus:bg-white" required>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2 ml-1">
+                        ※ 有効期限切れのトークンは使用できません。
+                    </p>
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-lg shadow-lg hover:shadow-xl transition duration-300 transform hover:-translate-y-0.5 flex justify-center items-center">
+                    <span>認証して進む</span>
+                    <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </form>
+        </div>
+        
+        <div class="bg-gray-50 px-8 py-4 border-t border-gray-100 text-center">
+            <p class="text-xs text-gray-500">&copy; Signage System Portal</p>
+        </div>
+    </div>
+
+</body>
+</html>
