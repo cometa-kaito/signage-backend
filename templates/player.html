@@ -9,10 +9,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Noto Sans JP', sans-serif; background-color: #000; color: #fff; overflow: hidden; }
-        .slot-container { height: 100%; width: 100%; position: relative; overflow: hidden; }
+        .slot-container { height: 100%; width: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         
         /* スライドショー用 */
-        .slide { position: absolute; inset: 0; opacity: 0; transition: opacity 1s ease-in-out; object-fit: cover; width: 100%; height: 100%; }
+        .slide { 
+            position: absolute; 
+            inset: 0; 
+            opacity: 0; 
+            transition: opacity 1s ease-in-out; 
+            object-fit: contain; 
+            width: 100%; 
+            height: 100%; 
+            background-color: #000;
+        }
         .slide.active { opacity: 1; }
 
         /* 緊急地震速報・避難など */
@@ -20,11 +29,48 @@
         @keyframes flashRed { 0%, 100% { background-color: #ef4444; } 50% { background-color: #b91c1c; } }
 
         /* コンテンツごとのスタイル調整 */
-        .content-wrap { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1rem; text-align: center; }
-        .text-body { font-size: 1.5rem; white-space: pre-wrap; line-height: 1.4; }
-        .text-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem; color: #aaa; }
+        .content-wrap { 
+            height: 100%; 
+            width: 100%;
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            padding: 0.5rem; 
+            text-align: center; 
+        }
         
-        img.main-image { max-height: 80%; max-width: 100%; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); }
+        /* 画像単体表示用 */
+        .image-wrapper {
+            flex-grow: 1;
+            width: 100%;
+            height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        img.main-image { 
+            max-width: 100%; 
+            max-height: 100%; 
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 0.25rem;
+        }
+
+        .text-body { font-size: 1.25rem; white-space: pre-wrap; line-height: 1.4; margin-bottom: 0.5rem; }
+        .text-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 0.5rem; color: #ccc; flex-shrink: 0; }
+        
+        /* ★修正箇所: rounded; を border-radius: 4px; に変更 */
+        .text-note { 
+            font-size: 0.9rem; 
+            margin-top: 0.5rem; 
+            background: rgba(255,255,255,0.2); 
+            padding: 2px 8px; 
+            border-radius: 4px; 
+            flex-shrink: 0; 
+        }
     </style>
 </head>
 <body class="h-screen w-screen">
@@ -35,36 +81,30 @@
 
     <!-- オフライン通知用インジケーター -->
     <div id="offline-indicator" class="hidden absolute top-0 right-0 m-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg border border-white opacity-80 z-50">
-        <i class="fa-solid fa-wifi-slash mr-1"></i> OFFLINE MODE
+        <i class="fa-solid fa-wifi-slash mr-1"></i> OFFLINE
     </div>
 
     <script>
-        // ★ Service Worker 登録
+        // --- Service Worker 登録 ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/v1/display/sw.js')
-                    .then(reg => console.log('SW Registered!', reg))
+                    .then(reg => console.log('SW Registered'))
                     .catch(err => console.log('SW Failed', err));
             });
         }
 
-        // ネットワーク状態監視
-        window.addEventListener('offline', () => {
-            document.getElementById('offline-indicator').classList.remove('hidden');
-        });
+        window.addEventListener('offline', () => document.getElementById('offline-indicator').classList.remove('hidden'));
         window.addEventListener('online', () => {
             document.getElementById('offline-indicator').classList.add('hidden');
-            location.reload(); // 復帰したらリロードして最新にする
+            location.reload(); 
         });
 
         const schoolId = "{{ school_id }}";
         const app = document.getElementById('app');
-        
-        // 状態管理
         let configData = null;
         let intervals = [];
 
-        // 初期化
         async function init() {
             try {
                 const res = await fetch(`/v1/display/config?school_id=${schoolId}`);
@@ -73,20 +113,15 @@
                 render();
             } catch (e) {
                 console.error("Config load failed", e);
-                // 失敗したら、オフラインキャッシュが効いていればSWが古いconfigを返しているはずだが、
-                // それすら無い初回などの場合はリトライ
                 setTimeout(init, 10000);
             }
         }
 
-        // 描画ロジック
         function render() {
-            // クリーンアップ
             app.innerHTML = '';
             intervals.forEach(clearInterval);
             intervals = [];
 
-            // レイアウト決定
             const layoutType = configData.layout_type;
             let gridClass = 'grid-cols-1';
             if (layoutType === 2) gridClass = 'grid-cols-2';
@@ -94,7 +129,6 @@
             if (layoutType === 4) gridClass = 'grid-cols-2 grid-rows-2';
             app.className = `h-full w-full grid gap-2 p-2 bg-black ${gridClass}`;
 
-            // スロット生成
             configData.slots.forEach(slot => {
                 const el = document.createElement('div');
                 el.className = 'slot-container bg-gray-900 rounded-xl overflow-hidden shadow-lg border border-gray-800';
@@ -127,9 +161,11 @@
                 } else if (type === 'countdown' && content.target_time) {
                     el.innerHTML = `
                         <div class="content-wrap bg-gradient-to-br from-purple-900 to-indigo-900">
-                            <div class="text-title">${content.body || 'Countdown'}</div>
-                            <div class="text-5xl md:text-7xl font-black font-mono tracking-wider countdown-timer text-yellow-400">--:--:--</div>
-                            <div class="text-sm mt-4 text-gray-300">Target: ${new Date(content.target_time).toLocaleString()}</div>
+                            <div class="text-title text-white/80">${content.body || 'Countdown'}</div>
+                            <div class="flex-grow flex items-center justify-center">
+                                <div class="text-[10vw] md:text-[5vw] font-black font-mono tracking-wider countdown-timer text-yellow-400 leading-none">--:--:--</div>
+                            </div>
+                            <div class="text-xs text-gray-400 mb-2">Target: ${new Date(content.target_time).toLocaleString()}</div>
                         </div>
                     `;
                     
@@ -139,13 +175,11 @@
                     const updateTimer = () => {
                         const now = new Date().getTime();
                         const diff = target - now;
-                        
                         if (diff < 0) {
                             timerEl.innerText = "FINISH";
                             timerEl.classList.add("animate-pulse", "text-red-500");
                             return;
                         }
-
                         const d = Math.floor(diff / (1000 * 60 * 60 * 24));
                         const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                         const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -160,21 +194,23 @@
                     updateTimer();
                     intervals.push(setInterval(updateTimer, 1000));
 
-                // --- 3. 熱中症アラート (WBGT) ---
+                // --- 3. 熱中症アラート ---
                 } else if (type === 'wbgt') {
                     const level = content.level || 'safe';
                     const configs = {
-                        safe: { color: 'bg-blue-600', icon: 'fa-face-smile', text: '安全 / 注意なし' },
-                        warning: { color: 'bg-yellow-500', icon: 'fa-face-flushed', text: '警戒 (休憩推奨)', textCol: 'text-black' },
-                        danger: { color: 'bg-red-600', icon: 'fa-triangle-exclamation', text: '危険 (運動中止)', anim: 'animate-pulse' }
+                        safe: { color: 'bg-blue-600', icon: 'fa-face-smile', text: '安全' },
+                        warning: { color: 'bg-yellow-500', icon: 'fa-face-flushed', text: '警戒', textCol: 'text-black' },
+                        danger: { color: 'bg-red-600', icon: 'fa-triangle-exclamation', text: '危険', anim: 'animate-pulse' }
                     };
                     const c = configs[level] || configs.safe;
                     
                     el.innerHTML = `
                         <div class="content-wrap ${c.color} ${c.textCol || 'text-white'}">
-                            <div class="text-2xl font-bold mb-4">熱中症警戒情報</div>
-                            <i class="fa-regular ${c.icon} text-8xl mb-6 ${c.anim || ''}"></i>
-                            <div class="text-4xl font-black">${c.text}</div>
+                            <div class="text-xl font-bold mb-2">熱中症警戒情報</div>
+                            <div class="flex-grow flex flex-col items-center justify-center">
+                                <i class="fa-regular ${c.icon} text-[8vw] md:text-[5vw] mb-4 ${c.anim || ''}"></i>
+                                <div class="text-[5vw] md:text-[3vw] font-black">${c.text}</div>
+                            </div>
                         </div>
                     `;
 
@@ -182,9 +218,9 @@
                 } else if (type === 'emergency') {
                     el.innerHTML = `
                         <div class="content-wrap theme-urgent">
-                            <i class="fa-solid fa-triangle-exclamation text-8xl mb-4 text-yellow-300"></i>
-                            <div class="text-4xl md:text-6xl font-black mb-4">緊急連絡</div>
-                            <div class="text-3xl md:text-5xl font-bold border-4 border-white p-4 rounded-xl bg-red-800">${content.body}</div>
+                            <i class="fa-solid fa-triangle-exclamation text-6xl mb-4 text-yellow-300"></i>
+                            <div class="text-3xl font-black mb-4">緊急連絡</div>
+                            <div class="text-2xl font-bold border-4 border-white p-4 rounded-xl bg-red-800 w-full">${content.body}</div>
                         </div>
                     `;
 
@@ -196,33 +232,33 @@
                                 <i class="fa-solid ${type === 'bus' ? 'fa-bus' : 'fa-train'} mr-2"></i>
                                 ${type === 'bus' ? 'バス' : '電車'}時刻表
                             </div>
-                            <img src="${content.media_url}" class="main-image mb-2">
-                            ${content.body ? `<div class="bg-yellow-100 px-3 py-1 rounded text-lg font-bold border border-yellow-300">${content.body}</div>` : ''}
+                            <div class="image-wrapper">
+                                <img src="${content.media_url}" class="main-image">
+                            </div>
+                            ${content.body ? `<div class="text-note text-gray-800 font-bold border border-yellow-400 bg-yellow-100">${content.body}</div>` : ''}
                         </div>
                     `;
 
-                // --- 6. 通常のお知らせ / 部活 / 天気 ---
+                // --- 6. 通常のお知らせ / 天気 / 部活 ---
                 } else {
                     let bgClass = 'bg-gray-800';
                     if (type === 'weather') bgClass = 'bg-gradient-to-b from-blue-400 to-blue-600';
                     
                     let html = `<div class="content-wrap ${bgClass}">`;
                     
-                    // 天気用ヘッダー
-                    if (type === 'weather') html += `<div class="text-2xl font-bold mb-2"><i class="fa-solid fa-cloud-sun"></i> 天気予報</div>`;
-                    
-                    // 画像
-                    if (content.media_url) {
-                        html += `<img src="${content.media_url}" class="main-image mb-4">`;
+                    if (type === 'weather') {
+                        html += `<div class="text-xl font-bold mb-2 flex-shrink-0"><i class="fa-solid fa-cloud-sun"></i> 天気予報</div>`;
+                        if (content.body) html += `<div class="text-body flex-grow flex items-center justify-center font-bold text-2xl">${content.body}</div>`;
+                    } else {
+                        if (content.media_url) {
+                            html += `<div class="image-wrapper"><img src="${content.media_url}" class="main-image"></div>`;
+                        }
+                        if (content.body) {
+                            html += `<div class="text-body mt-2 text-base">${content.body}</div>`;
+                        } else if (!content.media_url) {
+                            html += `<div class="text-gray-500">情報がありません</div>`;
+                        }
                     }
-                    
-                    // テキスト
-                    if (content.body) {
-                        html += `<div class="text-body">${content.body}</div>`;
-                    } else if (!content.media_url) {
-                        html += `<div class="text-gray-500">情報がありません</div>`;
-                    }
-                    
                     html += `</div>`;
                     el.innerHTML = html;
                 }
@@ -231,7 +267,7 @@
             });
         }
 
-        // --- WebSocket (自動リロード) ---
+        // --- WebSocket ---
         function connectWs() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/${schoolId}`;
@@ -239,24 +275,14 @@
 
             ws.onmessage = (event) => {
                 if (event.data === "RELOAD") {
-                    console.log("Reload signal received");
-                    init(); // 画面全体リロードではなく、データ再取得＆再描画
+                    init(); 
                 }
             };
-
-            ws.onclose = () => {
-                setTimeout(connectWs, 5000);
-            };
+            ws.onclose = () => setTimeout(connectWs, 5000);
         }
 
-        // スタート
         init();
-        // WebSocketはネットがあるときだけ接続（SWでは扱えないため）
-        if (navigator.onLine) {
-            connectWs();
-        }
-
-        // 1分ごとに設定を再取得して、期限切れコンテンツなどを整理する
+        if (navigator.onLine) connectWs();
         setInterval(init, 60000);
 
     </script>
