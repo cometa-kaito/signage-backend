@@ -4,51 +4,143 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>学校管理ダッシュボード</title>
-    <!-- Tailwind CSS & Icons -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <!-- Flatpickr (Calendar) -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
-    
     <style> 
-        body { font-family: 'Noto Sans JP', sans-serif; }
-        .aspect-video { aspect-ratio: 16 / 9; }
-        /* モーダルアニメーション */
-        dialog[open] {
-            animation: fadeIn 0.2s ease-out;
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: #f3f4f6; }
+        
+        /* スライド編集キャンバス */
+        .slide-canvas {
+            aspect-ratio: 16 / 9;
+            width: 100%;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden; /* はみ出し禁止 */
+            position: relative;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            /* コンテンツ配置用 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        dialog::backdrop {
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
+
+        /* 内部コンテンツラッパー */
+        .slide-content-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            transform-origin: center center;
+            transition: transform 0.1s;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+
+        /* 編集可能エリア */
+        [contenteditable] {
+            min-height: 1.5em;
+            outline: none;
         }
-        /* カスタムスクロールバー */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+        [contenteditable]:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            cursor: text;
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f1f1; 
+        [contenteditable]:focus {
+            background-color: rgba(59, 130, 246, 0.1);
+            box-shadow: 0 0 0 2px #3b82f6;
+            border-radius: 4px;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #c1c1c1; 
-            border-radius: 3px;
+
+        /* 画像 */
+        .slide-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            flex-shrink: 1;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8; 
+
+        /* テキスト */
+        .slide-text {
+            white-space: pre-wrap;
+            line-height: 1.4;
+            padding: 0.5rem;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            flex-shrink: 0;
         }
+
+        /* ツールバー */
+        .toolbar-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.3rem;
+            transition: all 0.2s;
+            color: #4b5563;
+            border: 1px solid transparent;
+        }
+        .toolbar-btn:hover { background-color: #e5e7eb; color: #1f2937; }
+        .toolbar-btn.active { background-color: #dbeafe; color: #2563eb; border-color: #bfdbfe; }
+        
+        .toolbar-group {
+            display: flex;
+            gap: 0.25rem;
+            padding-right: 0.75rem;
+            margin-right: 0.75rem;
+            border-right: 1px solid #e5e7eb;
+        }
+        .toolbar-group:last-child { border-right: none; }
+
+        .color-picker-wrapper { position: relative; overflow: hidden; }
+        .color-input { position: absolute; left: -100%; top: -100%; width: 200%; height: 200%; cursor: pointer; opacity: 0; }
+
+        /* 左側のミニプレビュー用 */
+        .mini-slot {
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            background-color: #000;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .mini-slot:hover { border-color: #60a5fa; }
+        .mini-slot.active { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3); z-index: 10; }
+        
+        .mini-slot-label {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            font-size: 10px;
+            background: rgba(0,0,0,0.6);
+            padding: 1px 4px;
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 20;
+        }
+        
+        dialog[open] { animation: fadeIn 0.2s ease-out; }
+        dialog::backdrop { background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
+<body class="h-screen flex flex-col overflow-hidden">
     
     <!-- Header -->
-    <nav class="bg-slate-800 text-white shadow-lg sticky top-0 z-50">
-        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+    <nav class="bg-slate-800 text-white shadow-md z-50 shrink-0">
+        <div class="px-6 py-3 flex justify-between items-center">
             <div class="flex items-center space-x-3">
                 <i class="fa-solid fa-tv text-blue-400 text-xl"></i>
                 <div>
@@ -57,445 +149,499 @@
                 </div>
             </div>
             <div class="flex items-center space-x-4">
-                
-                <!-- 広告管理ボタン -->
-                <a href="/admin/ads" class="flex items-center text-sm bg-yellow-600 hover:bg-yellow-700 px-3 py-1.5 rounded transition shadow-sm font-bold mr-2" title="広告の承認・停止">
-                    <i class="fa-solid fa-rectangle-ad mr-2"></i> 広告管理
-                </a>
-
-                <!-- 端末(ラズパイ)ステータス -->
-                <div class="hidden md:flex flex-col items-end mr-1 border-r border-gray-600 pr-4">
-                    <span class="text-[10px] text-gray-400 uppercase tracking-wider">Terminal</span>
-                    {% if is_online %}
-                    <div class="flex items-center text-green-400 font-bold text-xs" title="最終通信: {{ last_seen }}">
-                        <span class="w-2 h-2 rounded-full bg-green-500 mr-1.5 animate-pulse"></span> ONLINE
-                    </div>
-                    {% else %}
-                    <div class="flex items-center text-gray-400 font-bold text-xs" title="最終通信: {{ last_seen }}">
-                        <span class="w-2 h-2 rounded-full bg-gray-500 mr-1.5"></span> OFFLINE
-                    </div>
-                    {% endif %}
-                </div>
-
-                <!-- サーバー(WebSocket)接続ステータス -->
-                <div class="hidden md:flex items-center bg-slate-700 rounded-full px-3 py-1" title="サーバー接続状態">
-                    <div id="connection-status" class="w-2 h-2 rounded-full bg-red-500 mr-2"></div>
-                    <span class="text-xs font-mono text-gray-300">SERVER</span>
-                </div>
-
-                <a href="/logout" class="bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded text-sm transition shadow-sm ml-2">
-                    <i class="fa-solid fa-right-from-bracket"></i>
+                <div id="connection-status" class="w-3 h-3 rounded-full bg-red-500" title="Server Connection"></div>
+                <a href="/logout" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm transition">
+                    <i class="fa-solid fa-sign-out-alt"></i>
                 </a>
             </div>
         </div>
     </nav>
 
-    <main class="flex-grow container mx-auto px-4 py-8 flex flex-col items-center">
+    <!-- Main Content Area -->
+    <div class="flex flex-grow overflow-hidden">
         
-        <!-- 説明文 -->
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-2">現在の配信内容</h2>
-            <p class="text-gray-500 text-sm">編集したい枠をクリックしてください。</p>
-        </div>
-
-        <!-- Preview Container (TV Frame) -->
-        <div class="relative w-full max-w-5xl bg-gray-900 rounded-xl p-4 shadow-2xl border-b-8 border-gray-800">
-            <!-- Screen Area -->
-            <div class="bg-black w-full aspect-video rounded-lg overflow-hidden relative">
-                
-                <!-- Grid Layout -->
-                <div class="w-full h-full grid gap-1 
-                            {% if school.layout_type == 1 %}grid-cols-1
-                            {% elif school.layout_type == 2 %}grid-cols-2
-                            {% elif school.layout_type == 3 %}grid-cols-3
-                            {% elif school.layout_type == 4 %}grid-cols-2 grid-rows-2
-                            {% else %}grid-cols-1{% endif %}">
-                    
-                    {% for item in slots_data %}
-                    {% set slot = item.slot %}
-                    {% set content = item.content %}
-                    
-                    <!-- Slot Item (Clickable) -->
-                    <div onclick="openModal('modal-{{ slot.id }}')" 
-                         class="relative bg-white group cursor-pointer overflow-hidden border-2 border-transparent hover:border-blue-500 transition-all duration-200">
-                        
-                        <!-- コンテンツプレビュー -->
-                        <div class="w-full h-full flex flex-col items-center justify-center p-4 text-center">
-                            
-                            <!-- 背景画像がある場合 -->
-                            {% if content and content.media_url %}
-                            <img src="{{ content.media_url }}" class="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:scale-105 transition duration-500">
-                            <div class="absolute inset-0 bg-black bg-opacity-30 group-hover:bg-opacity-20 transition"></div>
-                            {% endif %}
-
-                            <!-- アイコンとラベル (前面) -->
-                            <div class="relative z-10 pointer-events-none">
-                                <!-- タイプ別アイコン -->
-                                <div class="text-4xl mb-2 drop-shadow-md text-white/90 group-hover:text-white transition group-hover:scale-110 duration-300">
-                                    {% if slot.content_type == 'notice' %}<i class="fa-solid fa-bullhorn text-orange-400"></i>
-                                    {% elif slot.content_type == 'weather' %}<i class="fa-solid fa-cloud-sun text-blue-400"></i>
-                                    {% elif slot.content_type == 'ad' %}<i class="fa-solid fa-rectangle-ad text-purple-400"></i>
-                                    {% elif slot.content_type == 'bus' %}<i class="fa-solid fa-bus text-green-400"></i>
-                                    {% elif slot.content_type == 'train' %}<i class="fa-solid fa-train text-green-400"></i>
-                                    {% elif slot.content_type == 'countdown' %}<i class="fa-solid fa-hourglass-half text-pink-400"></i>
-                                    {% elif slot.content_type == 'wbgt' %}<i class="fa-solid fa-temperature-high text-red-500"></i>
-                                    {% elif slot.content_type == 'emergency' %}<i class="fa-solid fa-triangle-exclamation text-red-600 animate-pulse"></i>
-                                    {% elif slot.content_type == 'club_result' %}<i class="fa-solid fa-trophy text-yellow-400"></i>
-                                    {% elif slot.content_type == 'lost_found' %}<i class="fa-solid fa-key text-gray-300"></i>
-                                    {% endif %}
-                                </div>
-                                
-                                <!-- テキスト抜粋 -->
-                                {% if content and content.body %}
-                                <p class="text-white font-bold text-shadow line-clamp-2 px-2 text-sm sm:text-base bg-black/50 rounded py-1 backdrop-blur-sm">
-                                    {{ content.body }}
-                                </p>
-                                {% endif %}
-                                
-                                <!-- 自動配信系のメッセージ -->
-                                {% if slot.content_type == 'weather' %}
-                                <p class="text-white text-xs mt-1 bg-black/40 px-2 rounded">自動更新</p>
-                                {% elif slot.content_type == 'ad' %}
-                                <p class="text-white text-xs mt-1 bg-black/40 px-2 rounded">スライドショー</p>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <!-- Hover Overlay -->
-                        <div class="absolute inset-0 bg-blue-600 bg-opacity-0 group-hover:bg-opacity-20 flex items-center justify-center transition-all duration-200">
-                            <span class="bg-white text-blue-600 px-4 py-2 rounded-full font-bold shadow-lg opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-200 text-sm">
-                                <i class="fa-solid fa-pen mr-1"></i> 編集する
-                            </span>
-                        </div>
-                        
-                        <!-- Badge -->
-                        <div class="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-md">
-                            枠 {{ slot.position + 1 }}
-                        </div>
-
+        <!-- Left: Layout Preview & Selector -->
+        <div class="w-80 bg-white border-r border-gray-200 flex flex-col shrink-0 z-20 shadow-lg">
+            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1"><i class="fa-solid fa-table-cells mr-1"></i> 全体プレビュー</h2>
+                <p class="text-[10px] text-gray-400">編集したいエリアをクリックしてください</p>
+            </div>
+            
+            <div class="p-4 flex-grow overflow-y-auto bg-gray-100 flex flex-col items-center">
+                <!-- TV Frame for Mini Preview -->
+                <div class="w-full bg-gray-800 p-2 rounded-lg shadow-xl mb-4">
+                    <div id="mini-preview-grid" class="w-full aspect-video bg-black grid gap-0.5 relative">
+                        <!-- JSでここにグリッドを生成 -->
                     </div>
-                    {% endfor %}
+                </div>
+                
+                <div class="w-full bg-white p-3 rounded border border-gray-200 text-xs text-gray-500">
+                    <p class="mb-1 font-bold">現在の選択:</p>
+                    <p id="selected-slot-info" class="text-blue-600 font-bold text-sm">-</p>
                 </div>
             </div>
-            <!-- TV Stand decoration -->
-            <div class="absolute -bottom-6 left-1/2 transform -translate-x-1/2 w-1/3 h-6 bg-gray-800 rounded-b-lg shadow-md"></div>
         </div>
 
-    </main>
+        <!-- Center: Editor Canvas -->
+        <div class="flex-grow bg-gray-200 flex flex-col relative">
+            
+            <!-- Toolbar -->
+            <div id="editor-toolbar" class="bg-white border-b border-gray-200 px-4 py-2 flex items-center shadow-sm z-10 transition-opacity duration-200 overflow-x-auto">
+                
+                <!-- 色設定 -->
+                <div class="toolbar-group">
+                    <div class="relative toolbar-btn color-picker-wrapper" title="文字色">
+                        <i class="fa-solid fa-font"></i>
+                        <div class="h-1 w-6 rounded-full mt-0.5" id="tool-text-color-indicator" style="background-color: white; border:1px solid #ddd;"></div>
+                        <input type="color" id="tool-text-color" class="color-input" oninput="applyStyle('color', this.value)">
+                    </div>
+                    <div class="relative toolbar-btn color-picker-wrapper" title="背景色">
+                        <i class="fa-solid fa-fill-drip"></i>
+                        <div class="h-1 w-6 rounded-full mt-0.5" id="tool-bg-color-indicator" style="background-color: black; border:1px solid #ddd;"></div>
+                        <input type="color" id="tool-bg-color" class="color-input" oninput="applyStyle('backgroundColor', this.value)">
+                    </div>
+                </div>
 
-    <!-- Modals (Hidden by default) -->
-    {% for item in slots_data %}
-    {% set slot = item.slot %}
-    {% set content = item.content %}
-    
-    <dialog id="modal-{{ slot.id }}" class="p-0 rounded-xl shadow-2xl w-full max-w-lg backdrop:bg-gray-900/50">
-        <div class="bg-white rounded-xl overflow-hidden max-h-[90vh] flex flex-col">
-            <!-- Modal Header -->
-            <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center shrink-0">
-                <h3 class="font-bold text-lg flex items-center">
-                    <span class="bg-blue-500 text-xs px-2 py-1 rounded mr-3 shadow">枠 {{ slot.position + 1 }}</span>
-                    {% if slot.content_type == 'notice' %}お知らせ
-                    {% elif slot.content_type == 'weather' %}天気予報
-                    {% elif slot.content_type == 'ad' %}広告
-                    {% elif slot.content_type == 'bus' %}バス時刻表
-                    {% elif slot.content_type == 'train' %}電車時刻表
-                    {% elif slot.content_type == 'countdown' %}カウントダウン
-                    {% elif slot.content_type == 'wbgt' %}熱中症情報
-                    {% elif slot.content_type == 'emergency' %}緊急連絡
-                    {% elif slot.content_type == 'club_result' %}部活動
-                    {% elif slot.content_type == 'lost_found' %}落とし物
-                    {% endif %}
-                </h3>
-                <button onclick="closeModal('modal-{{ slot.id }}')" class="text-gray-400 hover:text-white transition text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <!-- 文字サイズ・太さ -->
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" onclick="applyStyle('fontSize', '1rem')" title="文字サイズ: 小"><span style="font-size: 10px">A</span></button>
+                    <button class="toolbar-btn" onclick="applyStyle('fontSize', '2rem')" title="文字サイズ: 中"><span style="font-size: 14px">A</span></button>
+                    <button class="toolbar-btn" onclick="applyStyle('fontSize', '4rem')" title="文字サイズ: 大"><span style="font-size: 18px">A</span></button>
+                    <button class="toolbar-btn" onclick="applyStyle('fontWeight', 'bold')" title="太字"><i class="fa-solid fa-bold"></i></button>
+                </div>
+
+                <!-- 配置・レイアウト -->
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" onclick="applyLayout('alignItems', 'flex-start')" title="左寄せ"><i class="fa-solid fa-align-left"></i></button>
+                    <button class="toolbar-btn" onclick="applyLayout('alignItems', 'center')" title="中央揃え"><i class="fa-solid fa-align-center"></i></button>
+                    <button class="toolbar-btn" onclick="applyLayout('alignItems', 'flex-end')" title="右寄せ"><i class="fa-solid fa-align-right"></i></button>
+                </div>
+                
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" onclick="applyLayout('flexDirection', 'column')" title="縦並び"><i class="fa-solid fa-image"></i><i class="fa-solid fa-font" style="font-size:0.5em"></i></button>
+                    <button class="toolbar-btn" onclick="applyLayout('flexDirection', 'column-reverse')" title="逆順"><i class="fa-solid fa-font"></i><i class="fa-regular fa-image" style="font-size:0.5em"></i></button>
+                </div>
+
+                <!-- 画像操作 -->
+                <div class="toolbar-group">
+                    <button class="toolbar-btn relative" onclick="document.getElementById('tool-image-upload').click()" title="画像挿入">
+                        <i class="fa-regular fa-image"></i>
+                        <input type="file" id="tool-image-upload" class="hidden" accept="image/*" onchange="uploadImage(this)">
+                    </button>
+                    <button class="toolbar-btn text-red-500 hover:text-red-600" onclick="removeImage()" title="画像削除">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+
+                <!-- 詳細設定 -->
+                <div class="toolbar-group border-none">
+                    <button class="toolbar-btn" onclick="document.getElementById('settings-modal').showModal()" title="スケジュール設定など">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center space-x-3 ml-auto">
+                    <span id="save-status" class="text-xs text-gray-400 font-medium"></span>
+                    <button onclick="saveCurrentSlot()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition flex items-center">
+                        <i class="fa-solid fa-cloud-arrow-up mr-2"></i> 保存
+                    </button>
+                </div>
             </div>
 
-            <!-- Modal Body (Scrollable) -->
-            <div class="p-6 overflow-y-auto custom-scrollbar">
-                <!-- 自動コンテンツの場合 -->
-                {% if slot.content_type in ['weather', 'ad'] %}
-                    <div class="text-center py-10 flex flex-col items-center">
-                        <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-300">
-                            <i class="fa-solid fa-robot text-4xl"></i>
-                        </div>
-                        <p class="text-gray-800 font-bold text-lg">システムによる自動配信枠</p>
-                        <p class="text-sm text-gray-500 mt-2 max-w-xs">この枠の内容は、外部データ（天気APIや広告申請）に基づいて自動的に更新されます。</p>
+            <!-- Canvas Area -->
+            <div class="flex-grow flex items-center justify-center p-8 overflow-hidden relative" id="canvas-wrapper">
+                
+                <!-- The Slide -->
+                <div id="editor-canvas" class="slide-canvas rounded-lg transition-all duration-300" style="max-height: 100%; max-width: 100%;">
+                    
+                    <!-- Wrapper for Auto-Scaling -->
+                    <div id="editor-content-wrapper" class="slide-content-wrapper">
                         
-                        {% if slot.content_type == 'ad' %}
-                        <div class="mt-6 w-full max-w-xs">
-                             <a href="/admin/ads" class="block w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2.5 px-4 rounded-lg shadow transition text-center text-sm">
-                                <i class="fa-solid fa-rectangle-ad mr-2"></i> 広告管理ページへ
-                             </a>
-                             <p class="text-xs text-gray-400 mt-2">広告の承認や停止はこちらから行えます</p>
+                        <!-- Image Layer -->
+                        <div class="slide-image-container" id="editor-image-container" style="flex-grow: 0; flex-shrink: 0; display:none;">
+                            <img id="editor-image" src="" class="slide-image">
                         </div>
-                        {% endif %}
 
-                        <button onclick="closeModal('modal-{{ slot.id }}')" class="mt-8 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2.5 px-8 rounded-full transition">
-                            閉じる
-                        </button>
+                        <!-- Text Layer -->
+                        <div id="editor-text" class="slide-text" contenteditable="true" spellcheck="false" 
+                             oninput="autoScale('editor-canvas', 'editor-content-wrapper')">
+                            テキストを入力...
+                        </div>
+
                     </div>
 
-                {% else %}
-                    <!-- 編集フォーム -->
-                    <form action="/update_content" method="post" enctype="multipart/form-data" class="space-y-6">
-                        <input type="hidden" name="slot_id" value="{{ slot.id }}">
+                </div>
 
-                        <!-- コンテンツ別フォーム -->
-                        {% if slot.content_type in ['bus', 'train'] %}
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">
-                                    <i class="fa-regular fa-image mr-1"></i>時刻表の写真
-                                </label>
-                                <!-- Custom File Upload -->
-                                <div class="relative group">
-                                    <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-blue-50 hover:border-blue-400 transition cursor-pointer bg-gray-50" onclick="document.getElementById('file-{{ slot.id }}').click()">
-                                        <input type="file" id="file-{{ slot.id }}" name="file" accept="image/*" class="hidden" onchange="previewImage(this, 'preview-{{ slot.id }}')">
-                                        
-                                        <!-- Preview Area -->
-                                        <div id="preview-{{ slot.id }}" class="mt-2 {% if not (content and content.media_url) %}hidden{% endif %}">
-                                            <img src="{{ content.media_url if content else '' }}" class="max-h-48 mx-auto rounded shadow-sm">
-                                            <p class="text-xs text-green-600 font-bold mt-2"><i class="fa-solid fa-check mr-1"></i>画像が選択されています</p>
-                                        </div>
-                                        
-                                        <div class="{% if content and content.media_url %}hidden{% endif %} preview-placeholder">
-                                            <i class="fa-solid fa-camera text-3xl text-gray-400 mb-2 group-hover:text-blue-500 transition"></i>
-                                            <p class="text-sm text-gray-500 group-hover:text-blue-600 font-medium">クリックして写真をアップロード</p>
-                                            <p class="text-xs text-gray-400 mt-1">またはドラッグ＆ドロップ</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">
-                                    <i class="fa-solid fa-pen mr-1"></i>メモ (任意)
-                                </label>
-                                <input type="text" name="body" value="{{ content.body if content else '' }}" placeholder="例: 平日ダイヤ改正版" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
-                            </div>
+                <!-- Overlay for Auto Slots -->
+                <div id="editor-locked-overlay" class="absolute inset-0 bg-gray-100/90 z-20 flex flex-col items-center justify-center hidden">
+                    <i class="fa-solid fa-robot text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-xl font-bold text-gray-600">自動配信枠</h3>
+                    <p class="text-gray-500 mt-2">この枠の内容はシステムが自動的に更新します。</p>
+                </div>
 
-                        {% elif slot.content_type == 'countdown' %}
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">イベント名</label>
-                                <input type="text" name="body" value="{{ content.body if content else '' }}" placeholder="例: 体育祭まで" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none transition font-bold" required>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">ターゲット日時</label>
-                                <div class="relative">
-                                    <input type="text" name="end_at" 
-                                           class="flatpickr w-full bg-gray-50 border border-gray-300 rounded-lg p-3 pl-10 focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer" 
-                                           placeholder="日付を選択してください"
-                                           data-default-date="{{ content.end_at.strftime('%Y-%m-%d %H:%M') if content and content.end_at else '' }}"
-                                           required>
-                                    <i class="fa-regular fa-calendar absolute left-3 top-3.5 text-gray-400 pointer-events-none"></i>
-                                </div>
-                            </div>
+            </div>
+        </div>
+    </div>
 
-                        {% elif slot.content_type == 'wbgt' %}
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-3">現在の危険度を選択</label>
-                                <div class="grid grid-cols-1 gap-3">
-                                    <label class="cursor-pointer relative">
-                                        <input type="radio" name="body" value="safe" class="peer sr-only" {% if content and content.body == 'safe' %}checked{% endif %}>
-                                        <div class="p-4 rounded-xl border-2 border-gray-200 hover:bg-blue-50 peer-checked:border-blue-500 peer-checked:bg-blue-50 transition flex items-center">
-                                            <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 text-xl">
-                                                <i class="fa-regular fa-face-smile"></i>
-                                            </div>
-                                            <div>
-                                                <div class="font-bold text-gray-800">安全 / 注意なし</div>
-                                                <div class="text-xs text-gray-500">通常通り活動できます</div>
-                                            </div>
-                                            <i class="fa-solid fa-circle-check text-blue-500 text-xl ml-auto opacity-0 peer-checked:opacity-100 transition"></i>
-                                        </div>
-                                    </label>
-                                    
-                                    <label class="cursor-pointer relative">
-                                        <input type="radio" name="body" value="warning" class="peer sr-only" {% if content and content.body == 'warning' %}checked{% endif %}>
-                                        <div class="p-4 rounded-xl border-2 border-gray-200 hover:bg-yellow-50 peer-checked:border-yellow-500 peer-checked:bg-yellow-50 transition flex items-center">
-                                            <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center mr-3 text-xl">
-                                                <i class="fa-regular fa-face-flushed"></i>
-                                            </div>
-                                            <div>
-                                                <div class="font-bold text-gray-800">警戒 (休憩推奨)</div>
-                                                <div class="text-xs text-gray-500">こまめな水分補給が必要です</div>
-                                            </div>
-                                            <i class="fa-solid fa-circle-check text-yellow-500 text-xl ml-auto opacity-0 peer-checked:opacity-100 transition"></i>
-                                        </div>
-                                    </label>
-
-                                    <label class="cursor-pointer relative">
-                                        <input type="radio" name="body" value="danger" class="peer sr-only" {% if content and content.body == 'danger' %}checked{% endif %}>
-                                        <div class="p-4 rounded-xl border-2 border-gray-200 hover:bg-red-50 peer-checked:border-red-500 peer-checked:bg-red-50 transition flex items-center">
-                                            <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center mr-3 text-xl">
-                                                <i class="fa-solid fa-triangle-exclamation"></i>
-                                            </div>
-                                            <div>
-                                                <div class="font-bold text-gray-800">危険 (運動中止)</div>
-                                                <div class="text-xs text-gray-500">屋外活動を直ちに中止してください</div>
-                                            </div>
-                                            <i class="fa-solid fa-circle-check text-red-500 text-xl ml-auto opacity-0 peer-checked:opacity-100 transition"></i>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                        {% elif slot.content_type == 'emergency' %}
-                            <div>
-                                <label class="block text-sm font-bold text-red-600 mb-2">
-                                    <i class="fa-solid fa-triangle-exclamation mr-1"></i>緊急メッセージ
-                                </label>
-                                <div class="relative">
-                                    <textarea name="body" rows="4" placeholder="ここに避難指示などを入力してください" class="w-full border-2 border-red-300 rounded-xl p-4 text-lg font-bold text-gray-800 focus:ring-4 focus:ring-red-100 focus:border-red-500 outline-none transition" required>{{ content.body if content else '' }}</textarea>
-                                    <div class="absolute bottom-3 right-3 text-red-300 text-xs">全画面に赤色で表示されます</div>
-                                </div>
-                            </div>
-                            <input type="hidden" name="theme" value="urgent">
-
-                        {% else %}
-                            <!-- Standard Form (Notice, Club, Lost&Found) -->
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">
-                                    <i class="fa-solid fa-pen-nib mr-1"></i>テキスト本文
-                                </label>
-                                <textarea name="body" rows="4" placeholder="お知らせ内容を入力..." class="w-full bg-gray-50 border border-gray-300 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">{{ content.body if content else '' }}</textarea>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">
-                                    <i class="fa-regular fa-image mr-1"></i>画像 (任意)
-                                </label>
-                                <div class="relative group">
-                                    <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-blue-50 hover:border-blue-400 transition cursor-pointer bg-gray-50" onclick="document.getElementById('file-{{ slot.id }}').click()">
-                                        <input type="file" id="file-{{ slot.id }}" name="file" accept="image/*" class="hidden" onchange="previewImage(this, 'preview-{{ slot.id }}')">
-                                        
-                                        <div id="preview-{{ slot.id }}" class="{% if not (content and content.media_url) %}hidden{% endif %}">
-                                            <img src="{{ content.media_url if content else '' }}" class="h-32 mx-auto rounded object-cover shadow-sm">
-                                            <p class="text-xs text-green-600 font-bold mt-2">選択済み</p>
-                                        </div>
-                                        
-                                        <div class="{% if content and content.media_url %}hidden{% endif %} preview-placeholder flex flex-col items-center py-2">
-                                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-400 mb-1 group-hover:text-blue-500 transition"></i>
-                                            <span class="text-xs text-gray-500 font-bold group-hover:text-blue-600">画像を選択</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        {% endif %}
-
-                        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                            <button type="button" onclick="closeModal('modal-{{ slot.id }}')" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-2.5 px-5 rounded-lg transition text-sm">
-                                キャンセル
-                            </button>
-                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-8 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 text-sm flex items-center">
-                                <i class="fa-solid fa-paper-plane mr-2"></i> 保存して配信
-                            </button>
+    <!-- Settings Modal -->
+    <dialog id="settings-modal" class="p-0 rounded-xl shadow-2xl w-full max-w-md backdrop:bg-gray-900/50">
+        <div class="bg-white rounded-xl overflow-hidden">
+            <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="font-bold">詳細設定</h3>
+                <button onclick="document.getElementById('settings-modal').close()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">掲載期間</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <span class="text-xs text-gray-500">開始</span>
+                            <input type="text" id="setting-start-at" class="flatpickr w-full border rounded p-2 text-sm">
                         </div>
-                    </form>
-                {% endif %}
+                        <div>
+                            <span class="text-xs text-gray-500">終了</span>
+                            <input type="text" id="setting-end-at" class="flatpickr w-full border rounded p-2 text-sm">
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">テーマ (緊急時など)</label>
+                    <select id="setting-theme" class="w-full border rounded p-2 text-sm">
+                        <option value="default">標準</option>
+                        <option value="urgent">緊急 (赤背景)</option>
+                        <option value="happy">お祝い (明るい)</option>
+                    </select>
+                </div>
+                <div class="pt-4 border-t flex justify-end">
+                    <button onclick="document.getElementById('settings-modal').close()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">閉じる</button>
+                </div>
             </div>
         </div>
     </dialog>
-    {% endfor %}
 
-    <!-- Footer -->
-    <footer class="mt-auto py-6 text-center text-xs text-gray-400">
-        &copy; Signage System Panel
-    </footer>
-
-    <!-- WebSocket & Modal Script -->
+    <!-- Data Store -->
     <script>
-        // --- Flatpickr (Calendar) Init ---
-        document.addEventListener('DOMContentLoaded', function() {
-            flatpickr(".flatpickr", {
-                enableTime: true,
-                dateFormat: "Y-m-d H:i",
-                locale: "ja",
-                time_24hr: true
-            });
-            
-            // Set default dates from data attribute
-            document.querySelectorAll('.flatpickr').forEach(el => {
-                if (el.dataset.defaultDate) {
-                    el._flatpickr.setDate(el.dataset.defaultDate);
-                }
+        const slotsData = {{ slots_data | tojson }};
+        const currentSchoolId = "{{ school.id }}";
+        const currentLayoutType = {{ school.layout_type }};
+        let currentSlotId = null;
+        let currentFile = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            flatpickr(".flatpickr", { enableTime: true, dateFormat: "Y-m-d H:i", locale: "ja", time_24hr: true });
+            renderMiniPreview();
+            if (slotsData.length > 0) selectSlot(slotsData[0].slot.id);
+            connectWs();
+            window.addEventListener('resize', () => {
+                if(currentSlotId) autoScale('editor-canvas', 'editor-content-wrapper');
+                renderMiniPreview();
             });
         });
 
-        // --- Image Preview Logic ---
-        function previewImage(input, previewId) {
-            const previewContainer = document.getElementById(previewId);
-            const placeholder = input.parentElement.querySelector('.preview-placeholder');
+        // RGB to Hex utility
+        function rgbToHex(rgb) {
+            if (!rgb || rgb.startsWith('#')) return rgb;
+            const sep = rgb.indexOf(",") > -1 ? "," : " ";
+            const rgbvals = rgb.substr(4).split(")")[0].split(sep);
+            let r = (+rgbvals[0]).toString(16), g = (+rgbvals[1]).toString(16), b = (+rgbvals[2]).toString(16);
+            if (r.length == 1) r = "0" + r;
+            if (g.length == 1) g = "0" + g;
+            if (b.length == 1) b = "0" + b;
+            return "#" + r + g + b;
+        }
+
+        function autoScale(parentId, childId) {
+            const parent = document.getElementById(parentId);
+            const child = document.getElementById(childId);
+            if (!parent || !child) return;
+            child.style.transform = 'scale(1)';
+            const scale = Math.min(parent.clientWidth / child.scrollWidth, parent.clientHeight / child.scrollHeight) * 0.95;
+            if (scale < 1) child.style.transform = `scale(${scale})`;
+        }
+
+        function renderMiniPreview() {
+            const container = document.getElementById('mini-preview-grid');
+            let gridClass = 'grid-cols-1';
+            let slotSpans = [];
+
+            if (currentLayoutType === 2) { gridClass = 'grid-cols-2'; slotSpans = ['', '']; }
+            else if (currentLayoutType === 3) { gridClass = 'grid-cols-3'; slotSpans = ['', '', '']; }
+            else if (currentLayoutType === 4) { gridClass = 'grid-cols-2 grid-rows-2'; slotSpans = ['', '', '', '']; }
+            else if (currentLayoutType === 5) { gridClass = 'grid-cols-6 grid-rows-2'; slotSpans = ['col-span-3', 'col-span-3', 'col-span-2', 'col-span-2', 'col-span-2']; }
+            else if (currentLayoutType === 6) { gridClass = 'grid-cols-3 grid-rows-2'; slotSpans = ['', '', '', '', '', '']; }
+            else if (currentLayoutType === 12) { gridClass = 'grid-cols-1 grid-rows-4'; slotSpans = ['row-span-3', 'row-span-1']; }
+            else if (currentLayoutType === 13) { gridClass = 'grid-cols-3 grid-rows-2'; slotSpans = ['col-span-2 row-span-2', '', '']; }
+            else if (currentLayoutType === 14) { gridClass = 'grid-cols-3 grid-rows-3'; slotSpans = ['col-span-3 row-span-2', '', '', '']; }
+            else if (currentLayoutType === 15) { gridClass = 'grid-cols-4 grid-rows-3'; slotSpans = ['col-span-4 row-span-2', '', '', '', '']; }
+            else if (currentLayoutType === 16) { gridClass = 'grid-cols-4 grid-rows-4'; slotSpans = ['col-span-3 row-span-4', '', '', '', '']; }
+
+            container.className = `w-full aspect-video bg-black grid gap-0.5 ${gridClass}`;
+            container.innerHTML = '';
+
+            slotsData.forEach((item, index) => {
+                const slot = item.slot;
+                const content = item.content || {};
+                const style = content.style_config || {};
+                const spanClass = slotSpans[index] || '';
+                
+                const el = document.createElement('div');
+                el.className = `mini-slot relative ${spanClass}`;
+                el.id = `mini-slot-${slot.id}`;
+                el.onclick = () => selectSlot(slot.id);
+                el.style.backgroundColor = style.bg_color || (slot.content_type==='weather'?'#2563eb':'#000');
+                
+                let innerHTML = `<div class="mini-slot-label">枠${slot.position + 1}</div>`;
+                innerHTML += `<div id="mini-content-${slot.id}" class="slide-content-wrapper" style="width:100%; height:100%; transform-origin:center center;">`;
+                
+                if (content.media_url) {
+                    innerHTML += `<img src="${content.media_url}" style="max-width:100%; max-height:100%; object-fit:contain;">`;
+                }
+                
+                if (!['weather','ad'].includes(slot.content_type)) {
+                    let text = content.body || '';
+                    if (slot.content_type === 'bus' || slot.content_type === 'train') text = '時刻表';
+                    if (text) {
+                        const tColor = style.text_color || '#fff';
+                        const baseSize = style.font_size ? parseFloat(style.font_size) : 1; 
+                        const tSize = (baseSize * 0.2) + 'rem'; 
+                        const tWeight = style.font_weight || 'normal';
+                        innerHTML += `<div style="color:${tColor}; font-size:${tSize}; font-weight:${tWeight}; padding:2px; line-height:1.2;">${text}</div>`;
+                    }
+                } else {
+                    let iconClass = 'fa-pen';
+                    if (slot.content_type === 'weather') iconClass = 'fa-cloud-sun';
+                    else if (slot.content_type === 'ad') iconClass = 'fa-rectangle-ad';
+                    innerHTML += `<i class="fa-solid ${iconClass} text-2xl opacity-70"></i>`;
+                }
+                innerHTML += `</div>`;
+                el.innerHTML = innerHTML;
+                container.appendChild(el);
+            });
             
+            setTimeout(() => {
+                slotsData.forEach(item => {
+                    autoScale(`mini-slot-${item.slot.id}`, `mini-content-${item.slot.id}`);
+                });
+            }, 100);
+        }
+
+        function selectSlot(slotId) {
+            currentSlotId = slotId;
+            document.querySelectorAll('.mini-slot').forEach(el => el.classList.remove('active'));
+            const miniSlot = document.getElementById(`mini-slot-${slotId}`);
+            if(miniSlot) miniSlot.classList.add('active');
+
+            const data = slotsData.find(d => d.slot.id === slotId);
+            if (!data) return;
+
+            const slot = data.slot;
+            const content = data.content || {};
+            const style = content.style_config || {};
+            
+            document.getElementById('selected-slot-info').innerText = `枠 ${slot.position + 1}: ${getContentLabel(slot.content_type)}`;
+
+            const isLocked = ['weather', 'ad'].includes(slot.content_type);
+            const overlay = document.getElementById('editor-locked-overlay');
+            const toolbar = document.getElementById('editor-toolbar');
+            
+            if (isLocked) {
+                overlay.classList.remove('hidden');
+                toolbar.style.opacity = '0.3';
+                toolbar.style.pointerEvents = 'none';
+            } else {
+                overlay.classList.add('hidden');
+                toolbar.style.opacity = '1';
+                toolbar.style.pointerEvents = 'auto';
+            }
+
+            const wrapper = document.getElementById('editor-content-wrapper');
+            const canvas = document.getElementById('editor-canvas');
+            const textEl = document.getElementById('editor-text');
+            const imgContainer = document.getElementById('editor-image-container');
+            const imgEl = document.getElementById('editor-image');
+            const imgPlaceholder = document.getElementById('editor-image-placeholder');
+            
+            // Text
+            textEl.innerText = content.body || '';
+            if (!content.body && !isLocked) textEl.innerText = 'テキストを入力...';
+
+            // Styles & Colors
+            const bgColor = rgbToHex(style.bg_color || '#000000');
+            const textColor = rgbToHex(style.text_color || '#ffffff');
+            const fontSize = style.font_size || '2rem';
+            const fontWeight = style.font_weight || 'normal';
+
+            canvas.style.backgroundColor = bgColor;
+            textEl.style.color = textColor;
+            textEl.style.fontSize = fontSize;
+            textEl.style.fontWeight = fontWeight;
+
+            // Layout
+            const justifyContent = style.justify_content || 'center';
+            const alignItems = style.align_items || 'center';
+            const flexDirection = style.flex_direction || 'column';
+
+            wrapper.style.justifyContent = justifyContent;
+            wrapper.style.alignItems = alignItems;
+            wrapper.style.flexDirection = flexDirection;
+            
+            if (alignItems === 'flex-start') textEl.style.textAlign = 'left';
+            else if (alignItems === 'flex-end') textEl.style.textAlign = 'right';
+            else textEl.style.textAlign = 'center';
+
+            // Update Tools
+            document.getElementById('tool-bg-color').value = bgColor;
+            document.getElementById('tool-bg-color-indicator').style.backgroundColor = bgColor;
+            document.getElementById('tool-text-color').value = textColor;
+            document.getElementById('tool-text-color-indicator').style.backgroundColor = textColor;
+
+            // Schedule Settings
+            document.getElementById('setting-start-at')._flatpickr.setDate(content.start_at || '');
+            document.getElementById('setting-end-at')._flatpickr.setDate(content.end_at || '');
+            document.getElementById('setting-theme').value = content.theme || 'default';
+
+            // Image
+            if (content.media_url) {
+                imgEl.src = content.media_url;
+                imgContainer.style.display = 'flex';
+                imgPlaceholder.style.display = 'none';
+            } else {
+                imgEl.src = '';
+                imgContainer.style.display = 'none';
+                imgPlaceholder.style.display = 'none';
+            }
+            
+            currentFile = null;
+            document.getElementById('tool-image-upload').value = '';
+            setTimeout(() => autoScale('editor-canvas', 'editor-content-wrapper'), 50);
+        }
+
+        function getContentLabel(type) {
+            const map = { 'notice': 'お知らせ', 'weather': '天気予報', 'ad': '広告', 'bus': 'バス時刻表', 'train': '電車時刻表', 'countdown': 'カウントダウン', 'wbgt': '熱中症情報', 'emergency': '緊急連絡', 'club_result': '部活動', 'lost_found': '落とし物' };
+            return map[type] || type;
+        }
+
+        function applyStyle(prop, val) {
+            const canvas = document.getElementById('editor-canvas');
+            const textEl = document.getElementById('editor-text');
+            if (prop === 'backgroundColor') {
+                canvas.style.backgroundColor = val;
+                document.getElementById('tool-bg-color-indicator').style.backgroundColor = val;
+            } else {
+                textEl.style[prop] = val;
+                if (prop === 'color') document.getElementById('tool-text-color-indicator').style.backgroundColor = val;
+            }
+            autoScale('editor-canvas', 'editor-content-wrapper');
+        }
+
+        function applyLayout(prop, val) {
+            const wrapper = document.getElementById('editor-content-wrapper');
+            const textEl = document.getElementById('editor-text');
+            wrapper.style[prop] = val;
+            if (prop === 'alignItems') {
+                if (val === 'flex-start') textEl.style.textAlign = 'left';
+                else if (val === 'flex-end') textEl.style.textAlign = 'right';
+                else textEl.style.textAlign = 'center';
+            }
+            autoScale('editor-canvas', 'editor-content-wrapper');
+        }
+
+        function uploadImage(input) {
             if (input.files && input.files[0]) {
+                currentFile = input.files[0];
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    // Create or update img tag
-                    let img = previewContainer.querySelector('img');
-                    if (!img) {
-                        img = document.createElement('img');
-                        img.className = "max-h-48 mx-auto rounded shadow-sm";
-                        previewContainer.insertBefore(img, previewContainer.firstChild);
-                    }
+                    const img = document.getElementById('editor-image');
+                    const container = document.getElementById('editor-image-container');
                     img.src = e.target.result;
-                    
-                    previewContainer.classList.remove('hidden');
-                    if(placeholder) placeholder.classList.add('hidden');
+                    container.style.display = 'flex';
+                    img.onload = () => autoScale('editor-canvas', 'editor-content-wrapper');
                 }
                 reader.readAsDataURL(input.files[0]);
             }
         }
 
-        // --- Modal Control ---
-        function openModal(id) {
-            document.getElementById(id).showModal();
-        }
-        function closeModal(id) {
-            const dialog = document.getElementById(id);
-            dialog.classList.add('closing'); // Animation hook if needed
-            dialog.close();
+        function removeImage() {
+            currentFile = 'DELETE';
+            const container = document.getElementById('editor-image-container');
+            container.style.display = 'none';
+            document.getElementById('tool-image-upload').value = '';
+            autoScale('editor-canvas', 'editor-content-wrapper');
         }
 
-        // Close modal when clicking outside
-        document.querySelectorAll('dialog').forEach(dialog => {
-            dialog.addEventListener('click', (event) => {
-                if (event.target === dialog) {
-                    dialog.close();
+        async function saveCurrentSlot() {
+            if (!currentSlotId) return;
+            const btn = document.querySelector('button[onclick="saveCurrentSlot()"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> 保存中...';
+
+            const canvas = document.getElementById('editor-canvas');
+            const wrapper = document.getElementById('editor-content-wrapper');
+            const textEl = document.getElementById('editor-text');
+            const formData = new FormData();
+
+            formData.append('slot_id', currentSlotId);
+            let bodyText = textEl.innerText;
+            if (bodyText === 'テキストを入力...') bodyText = '';
+            formData.append('body', bodyText);
+
+            // Style & Layout
+            formData.append('style_bg_color', rgbToHex(canvas.style.backgroundColor));
+            formData.append('style_text_color', rgbToHex(textEl.style.color));
+            formData.append('style_font_size', textEl.style.fontSize);
+            formData.append('style_font_weight', textEl.style.fontWeight);
+            formData.append('style_justify_content', wrapper.style.justifyContent);
+            formData.append('style_align_items', wrapper.style.alignItems);
+            formData.append('style_flex_direction', wrapper.style.flexDirection);
+            formData.append('style_text_align', textEl.style.textAlign);
+
+            // Schedule & Theme (from inputs)
+            formData.append('start_at', document.getElementById('setting-start-at').value);
+            formData.append('end_at', document.getElementById('setting-end-at').value);
+            formData.append('theme', document.getElementById('setting-theme').value);
+
+            if (currentFile) {
+                if (currentFile === 'DELETE') {
+                    formData.append('delete_image', 'true');
+                } else {
+                    formData.append('file', currentFile);
                 }
-            });
-        });
+            }
 
-        // --- WebSocket for Auto Reload ---
-        const schoolId = "{{ school.id }}";
-        const statusDot = document.getElementById('connection-status');
-        
+            try {
+                const response = await fetch('/update_content', { method: 'POST', body: formData });
+                if (response.ok || response.redirected) {
+                    const status = document.getElementById('save-status');
+                    status.innerText = '保存しました';
+                    status.classList.add('text-green-500');
+                    setTimeout(() => {
+                        status.innerText = '';
+                        status.classList.remove('text-green-500');
+                        location.reload(); 
+                    }, 1000);
+                } else {
+                    alert('保存に失敗しました');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('エラーが発生しました');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
         function connectWs() {
-            // Check protocol
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/${schoolId}`;
+            const wsUrl = `${protocol}//${window.location.host}/ws/${currentSchoolId}`;
             const ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-                console.log("WS Connected");
-                statusDot.classList.remove('bg-red-500');
-                statusDot.classList.add('bg-green-500', 'animate-pulse');
-            };
-
-            ws.onmessage = (event) => {
-                console.log("Message:", event.data);
-                if (event.data === "RELOAD") {
-                    location.reload();
-                }
-            };
-
-            ws.onclose = () => {
-                console.log("WS Disconnected");
-                statusDot.classList.remove('bg-green-500', 'animate-pulse');
-                statusDot.classList.add('bg-red-500');
-                // Reconnect after 5s
-                setTimeout(connectWs, 5000);
-            };
+            const dot = document.getElementById('connection-status');
+            ws.onopen = () => { dot.classList.remove('bg-red-500'); dot.classList.add('bg-green-500'); };
+            ws.onmessage = (event) => { if (event.data === "RELOAD") console.log("Remote update detected"); };
+            ws.onclose = () => { dot.classList.remove('bg-green-500'); dot.classList.add('bg-red-500'); setTimeout(connectWs, 5000); };
         }
-
-        connectWs();
     </script>
 </body>
 </html>

@@ -6,47 +6,31 @@
     <h1 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-rectangle-ad text-yellow-500 mr-2"></i>広告案件管理</h1>
 </div>
 
-<!-- 絞り込みフィルター -->
+<!-- 絞り込みフィルター (既存のまま) -->
 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
     <form action="/super_admin/ads" method="get" class="flex flex-col md:flex-row gap-4 items-end">
-        
-        <!-- ステータス選択 -->
         <div class="flex-1 w-full">
             <label class="block text-xs font-bold text-gray-500 mb-1 ml-1">ステータス</label>
             <div class="relative">
                 <select name="status" class="w-full appearance-none border border-gray-300 rounded-lg p-2.5 pl-3 pr-8 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none cursor-pointer bg-white transition">
                     <option value="">すべて表示</option>
-                    <option value="pending" {% if request.query_params.get('status') == 'pending' %}selected{% endif %}>承認待ち (Pending)</option>
-                    <option value="approved" {% if request.query_params.get('status') == 'approved' %}selected{% endif %}>承認済み (Approved)</option>
-                    <option value="rejected" {% if request.query_params.get('status') == 'rejected' %}selected{% endif %}>却下 (Rejected)</option>
+                    <option value="pending" {% if request.query_params.get('status') == 'pending' %}selected{% endif %}>承認待ち</option>
+                    <option value="approved" {% if request.query_params.get('status') == 'approved' %}selected{% endif %}>承認済み</option>
+                    <option value="rejected" {% if request.query_params.get('status') == 'rejected' %}selected{% endif %}>却下</option>
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-                    <i class="fa-solid fa-chevron-down text-xs"></i>
-                </div>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500"><i class="fa-solid fa-chevron-down text-xs"></i></div>
             </div>
         </div>
-
-        <!-- エリア検索 -->
         <div class="flex-1 w-full">
             <label class="block text-xs font-bold text-gray-500 mb-1 ml-1">ターゲットエリア (学校名)</label>
             <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <i class="fa-solid fa-magnifying-glass text-gray-400 text-xs"></i>
-                </div>
-                <input type="text" name="area" value="{{ request.query_params.get('area', '') }}" 
-                       placeholder="学校名を入力..." 
-                       class="w-full border border-gray-300 rounded-lg p-2.5 pl-9 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-magnifying-glass text-gray-400 text-xs"></i></div>
+                <input type="text" name="area" value="{{ request.query_params.get('area', '') }}" placeholder="学校名を入力..." class="w-full border border-gray-300 rounded-lg p-2.5 pl-9 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition">
             </div>
         </div>
-
-        <!-- ボタン -->
         <div class="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
-            <button type="submit" class="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-lg text-sm transition shadow-sm flex items-center justify-center">
-                <i class="fa-solid fa-filter mr-2"></i>絞り込み
-            </button>
-            <a href="/super_admin/ads" class="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-4 py-2.5 rounded-lg text-sm transition text-center flex items-center justify-center border border-gray-200">
-                クリア
-            </a>
+            <button type="submit" class="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-lg text-sm transition shadow-sm flex items-center justify-center"><i class="fa-solid fa-filter mr-2"></i>絞り込み</button>
+            <a href="/super_admin/ads" class="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-4 py-2.5 rounded-lg text-sm transition text-center flex items-center justify-center border border-gray-200">クリア</a>
         </div>
     </form>
 </div>
@@ -67,8 +51,9 @@
             <tr class="hover:bg-gray-50">
                 <td class="px-6 py-4">
                     {% if ad.media_url %}
-                    <a href="{{ ad.media_url }}" target="_blank">
-                        <img src="{{ ad.media_url }}" class="h-16 w-24 object-cover rounded border hover:opacity-80 transition">
+                    <a href="{{ ad.media_url }}" target="_blank" class="block w-24 h-16 bg-gray-100 rounded border overflow-hidden relative group">
+                        <!-- ★修正: object-containに変更し、背景をグレーに -->
+                        <img src="{{ ad.media_url }}" class="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition">
                     </a>
                     {% else %}
                     <span class="text-gray-300 text-xs">No Image</span>
@@ -76,13 +61,9 @@
                 </td>
                 <td class="px-6 py-4">
                     <p class="font-bold text-gray-800 text-base">{{ ad.title }}</p>
-                    <p class="text-gray-500 text-xs mt-1">
-                        <i class="fa-solid fa-user-pen mr-1"></i> {{ ad.applicant_name or ad.owner.username or '不明' }}
-                    </p>
+                    <p class="text-gray-500 text-xs mt-1"><i class="fa-solid fa-user-pen mr-1"></i> {{ ad.applicant_name or ad.owner.username or '不明' }}</p>
                 </td>
-                <td class="px-6 py-4 text-gray-600">
-                    <span class="bg-gray-100 px-2 py-1 rounded text-xs">{{ ad.target_area }}</span>
-                </td>
+                <td class="px-6 py-4 text-gray-600"><span class="bg-gray-100 px-2 py-1 rounded text-xs">{{ ad.target_area }}</span></td>
                 <td class="px-6 py-4 text-center">
                     {% if ad.status == AdStatus.APPROVED %}
                     <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">承認済み</span>
@@ -94,37 +75,24 @@
                 </td>
                 <td class="px-6 py-4 text-right">
                     <div class="flex justify-end gap-2">
-                        <!-- ステータス変更フォーム -->
                         <form action="/super_admin/ads/update_status" method="post">
                             <input type="hidden" name="ad_id" value="{{ ad.id }}">
                             {% if ad.status != AdStatus.APPROVED %}
-                            <button name="status_val" value="approved" class="bg-green-50 hover:bg-green-100 text-green-600 border border-green-200 px-3 py-1 rounded text-xs transition">
-                                <i class="fa-solid fa-check"></i> 承認
-                            </button>
+                            <button name="status_val" value="approved" class="bg-green-50 hover:bg-green-100 text-green-600 border border-green-200 px-3 py-1 rounded text-xs transition"><i class="fa-solid fa-check"></i> 承認</button>
                             {% endif %}
                             {% if ad.status != AdStatus.REJECTED %}
-                            <button name="status_val" value="rejected" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1 rounded text-xs transition">
-                                <i class="fa-solid fa-xmark"></i> 却下
-                            </button>
+                            <button name="status_val" value="rejected" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1 rounded text-xs transition"><i class="fa-solid fa-xmark"></i> 却下</button>
                             {% endif %}
                         </form>
-                        
-                        <!-- 削除フォーム -->
                         <form action="/super_admin/ads/delete" method="post" onsubmit="return confirm('本当に削除しますか？');">
                             <input type="hidden" name="ad_id" value="{{ ad.id }}">
-                            <button type="submit" class="text-gray-400 hover:text-red-500 px-2 py-1 transition ml-2" title="削除">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
+                            <button type="submit" class="text-gray-400 hover:text-red-500 px-2 py-1 transition ml-2" title="削除"><i class="fa-solid fa-trash"></i></button>
                         </form>
                     </div>
                 </td>
             </tr>
             {% else %}
-            <tr>
-                <td colspan="5" class="px-6 py-10 text-center text-gray-400">
-                    広告案件はありません
-                </td>
-            </tr>
+            <tr><td colspan="5" class="px-6 py-10 text-center text-gray-400">広告案件はありません</td></tr>
             {% endfor %}
         </tbody>
     </table>

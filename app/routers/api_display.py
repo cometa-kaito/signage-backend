@@ -1,9 +1,9 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse # FileResponse追加
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-import os # 追加
+import os
 
 from app.core.database import get_db
 from app.core.config import settings
@@ -13,22 +13,15 @@ from app.services.weather import get_weather_data
 router = APIRouter(prefix="/v1/display", tags=["display"])
 templates = Jinja2Templates(directory="templates")
 
-# ★追加: Service Workerを提供するためのルート
 @router.get("/sw.js")
 def get_service_worker():
-    """Service Workerファイルを返す"""
-    # staticディレクトリにある sw.js を返す想定
     file_path = os.path.join("static", "sw.js")
     return FileResponse(file_path, media_type="application/javascript")
 
 @router.get("/view", response_class=HTMLResponse)
 def display_view(request: Request, school_id: str):
-    """
-    サイネージ表示用プレイヤー
-    """
     return templates.TemplateResponse("player.html", {"request": request, "school_id": school_id})
 
-# ... (get_display_config など既存のコードはそのまま) ...
 @router.get("/config")
 def get_display_config(school_id: str, db: Session = Depends(get_db)):
     school = db.query(models.School).filter(models.School.id == school_id).first()
@@ -42,14 +35,13 @@ def get_display_config(school_id: str, db: Session = Depends(get_db)):
     lon = 136.7223
     now = datetime.now()
 
-    response_slots = []
-    slots = sorted(school.slots, key=lambda x: x.position)
-
     response = {
         "layout_type": school.layout_type,
         "school_name": school.name,
         "slots": []
     }
+
+    slots = sorted(school.slots, key=lambda x: x.position)
 
     for slot in slots:
         slot_data = {
@@ -81,9 +73,29 @@ def get_display_config(school_id: str, db: Session = Depends(get_db)):
                    (content.end_at and content.end_at < now):
                     slot_data["content"]["body"] = "" 
                 else:
+                    style = content.style_config or {}
+                    slot_data["content"]["style"] = style
+                    
+                    # ★追加: 複数スライドデータがある場合は含める
+                    if "slides" in style and isinstance(style["slides"], list) and len(style["slides"]) > 0:
+                        # URL補完
+                        processed_slides = []
+                        for s in style["slides"]:
+                            if s.get("rendered_image_url"):
+                                s["rendered_image_url"] = f"{settings.HOST_URL}{s['rendered_image_url']}"
+                            processed_slides.append(s)
+                        slot_data["content"]["slides"] = processed_slides
+
+                    # 従来の互換表示 (1枚目として扱う)
                     slot_data["content"]["body"] = content.body
                     slot_data["content"]["theme"] = content.theme
-                    if content.media_url:
+                    
+                    if style.get("rendered_image_url") and slot.content_type not in ['weather', 'ad', 'countdown']:
+                         # スライドリストがない場合のみ単体レンダリング画像を使う
+                        if not slot_data["content"].get("slides"):
+                            slot_data["content"]["media_url"] = f"{settings.HOST_URL}{style['rendered_image_url']}"
+                            slot_data["content"]["body"] = "" 
+                    elif content.media_url:
                         slot_data["content"]["media_url"] = content.media_url if content.media_url.startswith("http") else f"{settings.HOST_URL}{content.media_url}"
 
                     if slot.content_type == "countdown":

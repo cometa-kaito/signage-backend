@@ -14,7 +14,6 @@ class ContentType(str, enum.Enum):
     NOTICE = "notice"
     WEATHER = "weather"
     AD = "ad"
-    # ★追加
     BUS = "bus"
     TRAIN = "train"
     COUNTDOWN = "countdown"
@@ -64,13 +63,19 @@ class Content(Base):
     __tablename__ = "contents"
     id = Column(Integer, primary_key=True, index=True)
     slot_id = Column(Integer, ForeignKey("slots.id"))
+    
     body = Column(Text, nullable=True)
     media_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
     start_at = Column(DateTime, nullable=True)
     end_at = Column(DateTime, nullable=True)
     theme = Column(String, default="default")
+    
+    # ★追加: 詳細なデザイン設定（文字色、背景色、サイズなどをJSONで保存）
+    style_config = Column(JSON, default={})
+
     slot = relationship("Slot", back_populates="contents")
 
 class Ad(Base):

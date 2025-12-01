@@ -9,212 +9,286 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Noto Sans JP', sans-serif; background-color: #000; color: #fff; overflow: hidden; }
-        .slot-container { height: 100%; width: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; }
-        .slide { position: absolute; inset: 0; opacity: 0; transition: opacity 1s ease-in-out; object-fit: contain; width: 100%; height: 100%; background-color: #000; }
-        .slide.active { opacity: 1; }
+        .slot-container { 
+            height: 100%; width: 100%; 
+            position: relative; overflow: hidden;
+            display: flex; flex-direction: column; 
+            border-radius: 0.5rem; /* 角丸追加 */
+        }
+        
+        /* スライド（コンテンツ）表示エリア */
+        .slide-content-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column; /* JSで変更される */
+            justify-content: center; /* JSで変更される */
+            align-items: center; /* JSで変更される */
+            text-align: center;
+            /* 強調表示を画像に適用 */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); 
+        }
+
+        /* 画像表示 (レンダリング画像) */
+        .rendered-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* 枠に収める */
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        /* 緊急・避難 */
         .theme-urgent { background-color: #ef4444; color: white; animation: flashRed 2s infinite; }
         @keyframes flashRed { 0%, 100% { background-color: #ef4444; } 50% { background-color: #b91c1c; } }
-        .content-wrap { height: 100%; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0.5rem; text-align: center; }
-        .image-wrapper { flex-grow: 1; width: 100%; height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        img.main-image { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 0.25rem; }
-        .text-body { font-size: 1.25rem; white-space: pre-wrap; line-height: 1.4; margin-bottom: 0.5rem; }
+
+        /* 汎用テキストスタイル */
+        .text-body { white-space: pre-wrap; line-height: 1.4; margin-bottom: 0.5rem; }
         .text-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 0.5rem; color: #ccc; flex-shrink: 0; }
         .text-note { font-size: 0.9rem; margin-top: 0.5rem; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
     </style>
 </head>
 <body class="h-screen w-screen">
-    <div id="app" class="h-full w-full grid gap-1 bg-black"></div>
-    <div id="offline-indicator" class="hidden absolute top-0 right-0 m-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg border border-white opacity-80 z-50"><i class="fa-solid fa-wifi-slash mr-1"></i> OFFLINE</div>
+
+    <div id="app" class="h-full w-full grid gap-1 bg-black">
+        <!-- JSでここにスロットが生成されます -->
+    </div>
+
+    <!-- オフライン通知用インジケーター -->
+    <div id="offline-indicator" class="hidden absolute top-0 right-0 m-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg border border-white opacity-80 z-50">
+        <i class="fa-solid fa-wifi-slash mr-1"></i> OFFLINE
+    </div>
 
     <script>
-        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/v1/display/sw.js'); }); }
+        // --- Service Worker 登録 ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/v1/display/sw.js')
+                    .then(reg => console.log('SW Registered'))
+                    .catch(err => console.log('SW Failed', err));
+            });
+        }
         window.addEventListener('offline', () => document.getElementById('offline-indicator').classList.remove('hidden'));
-        window.addEventListener('online', () => { document.getElementById('offline-indicator').classList.add('hidden'); location.reload(); });
+        window.addEventListener('online', () => {
+            document.getElementById('offline-indicator').classList.add('hidden');
+            // 接続復旧時にコンテンツを再読み込み
+            init(); 
+        });
 
         const schoolId = "{{ school_id }}";
         const app = document.getElementById('app');
         let configData = null;
         let intervals = [];
 
+        // レイアウト定義 (Grid数, SlotごとのSpan)
+        const LAYOUT_DEFINITIONS = {
+            1: { grid: [1, 1], slots: [[1,1]] },
+            2: { grid: [2, 1], slots: [[1,1], [1,1]] },
+            3: { grid: [3, 1], slots: [[1,1], [1,1], [1,1]] },
+            4: { grid: [2, 2], slots: [[1,1], [1,1], [1,1], [1,1]] },
+            5: { grid: [6, 2], slots: [[3,1], [3,1], [2,1], [2,1], [2,1]] },
+            6: { grid: [3, 2], slots: [[1,1], [1,1], [1,1], [1,1], [1,1], [1,1]] },
+            12: { grid: [1, 4], slots: [[1,3], [1,1]] },
+            13: { grid: [3, 2], slots: [[2,2], [1,1], [1,1]] },
+            14: { grid: [3, 3], slots: [[3,2], [1,1], [1,1], [1,1]] },
+            15: { grid: [4, 3], slots: [[4,2], [1,1], [1,1], [1,1], [1,1]] },
+            16: { grid: [4, 4], slots: [[3,4], [1,1], [1,1], [1,1], [1,1]] }
+        };
+        
         async function init() {
             try {
+                // 前回までのインターバルをクリア
+                intervals.forEach(clearInterval);
+                intervals = [];
+                
                 const res = await fetch(`/v1/display/config?school_id=${schoolId}`);
                 if (!res.ok) throw new Error("API Error");
                 configData = await res.json();
                 render();
-            } catch (e) { setTimeout(init, 10000); }
+            } catch (e) {
+                console.error("Config load failed. Retrying...", e);
+                // 失敗時も定期的にリトライ
+                setTimeout(init, 10000);
+            }
         }
 
+        // --- メイン描画処理 ---
         function render() {
             app.innerHTML = '';
-            intervals.forEach(clearInterval);
-            intervals = [];
 
             const layoutType = configData.layout_type;
-            let gridClass = 'grid-cols-1';
-            let slotSpans = [];
+            const def = LAYOUT_DEFINITIONS[layoutType] || LAYOUT_DEFINITIONS[1];
 
-            if (layoutType === 2) {
-                gridClass = 'grid-cols-2';
-                slotSpans = ['', ''];
-            } else if (layoutType === 3) {
-                gridClass = 'grid-cols-3';
-                slotSpans = ['', '', ''];
-            } else if (layoutType === 4) {
-                gridClass = 'grid-cols-2 grid-rows-2';
-                slotSpans = ['', '', '', ''];
-            } else if (layoutType === 5) {
-                // 等分割 5 (上2下3)
-                gridClass = 'grid-cols-6 grid-rows-2';
-                slotSpans = ['col-span-3', 'col-span-3', 'col-span-2', 'col-span-2', 'col-span-2'];
-            } else if (layoutType === 6) {
-                gridClass = 'grid-cols-3 grid-rows-2';
-                slotSpans = ['', '', '', '', '', ''];
-            } else if (layoutType === 12) {
-                // 上メイン2分割
-                gridClass = 'grid-cols-1 grid-rows-4';
-                slotSpans = ['row-span-3', 'row-span-1'];
-            } else if (layoutType === 13) {
-                // 左メイン3分割
-                gridClass = 'grid-cols-3 grid-rows-2';
-                slotSpans = ['col-span-2 row-span-2', '', ''];
-            } else if (layoutType === 14) {
-                // 上メイン4分割
-                gridClass = 'grid-cols-3 grid-rows-3';
-                slotSpans = ['col-span-3 row-span-2', '', '', ''];
-            } else if (layoutType === 15) {
-                // 上メイン5分割
-                gridClass = 'grid-cols-4 grid-rows-3';
-                slotSpans = ['col-span-4 row-span-2', '', '', '', ''];
-            } else if (layoutType === 16) {
-                // 左メイン6分割
-                gridClass = 'grid-cols-4 grid-rows-4';
-                slotSpans = ['col-span-3 row-span-4', '', '', '', ''];
-            }
-
-            app.className = `h-full w-full grid gap-2 p-2 bg-black ${gridClass}`;
+            // グリッドクラスの設定
+            app.style.display = 'grid';
+            app.style.gridTemplateColumns = `repeat(${def.grid[0]}, 1fr)`;
+            app.style.gridTemplateRows = `repeat(${def.grid[1]}, 1fr)`;
+            app.className = `h-full w-full grid gap-2 p-2 bg-black`;
 
             configData.slots.forEach((slot, index) => {
                 const el = document.createElement('div');
-                const spanClass = slotSpans[index] || '';
-                el.className = `slot-container bg-gray-900 rounded-xl overflow-hidden shadow-lg border border-gray-800 ${spanClass}`;
+                const slotDef = def.slots[slot.position] || [1, 1];
+                
+                el.className = `slot-container bg-gray-900 shadow-lg`;
+                el.style.gridColumn = `span ${slotDef[0]}`;
+                el.style.gridRow = `span ${slotDef[1]}`;
                 
                 const type = slot.content_type;
                 const content = slot.content || {};
+                const style = content.style || {};
 
-                if (type === 'ad' && content.slideshow && content.slideshow.length > 0) {
+                // --- 1. マルチスライド対応 ---
+                if (content.slides && content.slides.length > 0) {
+                    
+                    let currentSlideIdx = 0;
+                    
+                    const renderSlide = (slideIdx) => {
+                        el.innerHTML = ''; // クリア
+                        const slide = content.slides[slideIdx];
+                        
+                        // 背景色
+                        el.style.backgroundColor = slide.style.bg_color || '#1a1a1a';
+                        
+                        // レンダリング済み画像を表示する
+                        if (slide.rendered_image_url) {
+                            const img = document.createElement('img');
+                            img.src = slide.rendered_image_url;
+                            img.className = 'rendered-image';
+                            el.appendChild(img);
+                        }
+                    };
+
+                    // 初回描画
+                    renderSlide(0);
+
+                    // ループ設定
+                    if (content.slides.length > 1) {
+                        const nextSlide = () => {
+                            // 現在のスライド時間取得
+                            const duration = (content.slides[currentSlideIdx].duration || 10) * 1000;
+                            
+                            // 次のスライドへ
+                            currentSlideIdx = (currentSlideIdx + 1) % content.slides.length;
+                            renderSlide(currentSlideIdx);
+                            
+                            // 次のインターバルを再設定
+                            intervals.push(setTimeout(nextSlide, duration));
+                        };
+                        
+                        // 最初の待機時間後に開始
+                        intervals.push(setTimeout(nextSlide, (content.slides[0].duration || 10) * 1000));
+                    }
+
+                } else if (type === 'ad' && content.slideshow && content.slideshow.length > 0) {
+                    // --- 2. 従来の広告スライドショー (画像リスト) ---
+                    el.style.backgroundColor = '#000';
                     content.slideshow.forEach((url, idx) => {
                         const img = document.createElement('img');
                         img.src = url;
                         img.className = `slide ${idx === 0 ? 'active' : ''}`;
+                        img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'contain';
+                        img.style.position = 'absolute'; img.style.opacity = idx === 0 ? 1 : 0;
+                        img.style.transition = 'opacity 1s ease-in-out';
                         el.appendChild(img);
                     });
+                    
                     if (content.slideshow.length > 1) {
                         let current = 0;
                         const duration = content.duration || 10000;
                         const slides = el.querySelectorAll('.slide');
                         const iv = setInterval(() => {
-                            slides[current].classList.remove('active');
+                            slides[current].style.opacity = 0;
                             current = (current + 1) % slides.length;
-                            slides[current].classList.add('active');
+                            slides[current].style.opacity = 1;
                         }, duration);
                         intervals.push(iv);
                     }
-                } else if (type === 'countdown' && content.target_time) {
-                    el.innerHTML = `
-                        <div class="content-wrap bg-gradient-to-br from-purple-900 to-indigo-900">
-                            <div class="text-title text-white/80">${content.body || 'Countdown'}</div>
-                            <div class="flex-grow flex items-center justify-center w-full">
-                                <div class="font-black font-mono tracking-wider countdown-timer text-yellow-400 leading-none" style="font-size: min(10vw, 15vh);">--:--:--</div>
-                            </div>
-                            <div class="text-xs text-gray-400 mb-2">Target: ${new Date(content.target_time).toLocaleString()}</div>
-                        </div>
-                    `;
-                    const target = new Date(content.target_time).getTime();
-                    const timerEl = el.querySelector('.countdown-timer');
-                    const updateTimer = () => {
-                        const now = new Date().getTime();
-                        const diff = target - now;
-                        if (diff < 0) {
-                            timerEl.innerText = "FINISH";
-                            timerEl.classList.add("animate-pulse", "text-red-500");
-                            return;
-                        }
-                        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
-                        const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                        const s = Math.floor((diff % (1000 * 60)) / 1000);
-                        if (d > 0) timerEl.innerText = `${d}日 ${h}時間`;
-                        else timerEl.innerText = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-                    };
-                    updateTimer();
-                    intervals.push(setInterval(updateTimer, 1000));
-                } else if (type === 'wbgt') {
-                    const level = content.level || 'safe';
-                    const configs = {
-                        safe: { color: 'bg-blue-600', icon: 'fa-face-smile', text: '安全' },
-                        warning: { color: 'bg-yellow-500', icon: 'fa-face-flushed', text: '警戒', textCol: 'text-black' },
-                        danger: { color: 'bg-red-600', icon: 'fa-triangle-exclamation', text: '危険', anim: 'animate-pulse' }
-                    };
-                    const c = configs[level] || configs.safe;
-                    el.innerHTML = `
-                        <div class="content-wrap ${c.color} ${c.textCol || 'text-white'}">
-                            <div class="text-xl font-bold mb-2">熱中症警戒情報</div>
-                            <div class="flex-grow flex flex-col items-center justify-center">
-                                <i class="fa-regular ${c.icon} mb-4 ${c.anim || ''}" style="font-size: min(15vw, 20vh);"></i>
-                                <div class="font-black" style="font-size: min(6vw, 8vh);">${c.text}</div>
-                            </div>
-                        </div>
-                    `;
-                } else if (type === 'emergency') {
-                    el.innerHTML = `
-                        <div class="content-wrap theme-urgent">
-                            <i class="fa-solid fa-triangle-exclamation mb-4 text-yellow-300" style="font-size: min(15vw, 20vh);"></i>
-                            <div class="font-black mb-4" style="font-size: min(5vw, 8vh);">緊急連絡</div>
-                            <div class="font-bold border-4 border-white p-4 rounded-xl bg-red-800 w-full" style="font-size: min(4vw, 6vh);">${content.body}</div>
-                        </div>
-                    `;
-                } else if ((type === 'bus' || type === 'train') && content.media_url) {
-                    el.innerHTML = `
-                        <div class="content-wrap bg-white text-gray-800">
-                            <div class="text-title text-blue-600 flex items-center">
-                                <i class="fa-solid ${type === 'bus' ? 'fa-bus' : 'fa-train'} mr-2"></i>
-                                ${type === 'bus' ? 'バス' : '電車'}時刻表
-                            </div>
-                            <div class="image-wrapper"><img src="${content.media_url}" class="main-image"></div>
-                            ${content.body ? `<div class="text-note text-gray-800 font-bold border border-yellow-400 bg-yellow-100">${content.body}</div>` : ''}
-                        </div>
-                    `;
+                    
                 } else {
-                    let bgClass = 'bg-gray-800';
-                    if (type === 'weather') bgClass = 'bg-gradient-to-b from-blue-400 to-blue-600';
-                    let html = `<div class="content-wrap ${bgClass}">`;
+                    // --- 3. 動的コンテンツ (天気、緊急、カウントダウン) ---
+                    
+                    // 背景色
+                    if (type === 'weather') el.className += ' bg-gradient-to-b from-blue-400 to-blue-600';
+                    else if (type === 'emergency') el.className += ' theme-urgent';
+                    else el.style.backgroundColor = style.bg_color || '#1a1a1a';
+
+
+                    let html = `<div class="slide-content-wrapper" style="font-size: min(3vw, 4vh); color: ${style.text_color || 'white'};">`;
+
                     if (type === 'weather') {
                         html += `<div class="text-xl font-bold mb-2 flex-shrink-0"><i class="fa-solid fa-cloud-sun"></i> 天気予報</div>`;
                         if (content.body) html += `<div class="text-body flex-grow flex items-center justify-center font-bold text-2xl">${content.body}</div>`;
+                    } else if (type === 'emergency') {
+                        html += `<i class="fa-solid fa-triangle-exclamation mb-4 text-yellow-300" style="font-size: min(15vw, 20vh);"></i>
+                                 <div class="font-black mb-4" style="font-size: min(5vw, 8vh);">緊急連絡</div>
+                                 <div class="font-bold border-4 border-white p-4 rounded-xl bg-red-800 w-full" style="font-size: min(4vw, 6vh);">${content.body}</div>`;
+                    } else if (type === 'countdown' && content.target_time) {
+                        // カウントダウンロジック
+                        const target = new Date(content.target_time).getTime();
+                        const timerId = `timer-${slot.position}`;
+
+                        html += `<div class="text-title text-yellow-400">${content.body || 'Countdown'}</div>
+                                 <div class="flex-grow flex items-center justify-center w-full">
+                                    <div id="${timerId}" class="font-black font-mono tracking-wider leading-none" style="font-size: min(10vw, 15vh);">--:--:--</div>
+                                 </div>`;
+                        
+                        const updateTimer = () => {
+                            const now = new Date().getTime();
+                            const diff = target - now;
+                            const timerEl = document.getElementById(timerId);
+                            if (!timerEl) return;
+
+                            if (diff < 0) {
+                                timerEl.innerText = "FINISH";
+                                timerEl.classList.add("animate-pulse", "text-red-500");
+                                clearInterval(intervals.find(i => i.id === slot.position));
+                                return;
+                            }
+                            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+                            const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                            const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+                            if (d > 0) timerEl.innerText = `${d}日 ${h}時間`;
+                            else timerEl.innerText = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                        };
+                        intervals.push(setInterval(updateTimer, 1000));
+                        setTimeout(updateTimer, 0); // 即時実行
+                        
                     } else {
-                        if (content.media_url) html += `<div class="image-wrapper"><img src="${content.media_url}" class="main-image"></div>`;
-                        if (content.body) html += `<div class="text-body mt-2 text-base">${content.body}</div>`;
-                        else if (!content.media_url) html += `<div class="text-gray-500">情報がありません</div>`;
+                        html += `<div class="text-gray-500">情報がありません</div>`;
                     }
+
                     html += `</div>`;
                     el.innerHTML = html;
                 }
+
                 app.appendChild(el);
             });
         }
 
+        // --- WebSocket ---
         function connectWs() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/${schoolId}`;
+            // Render環境ではホスト名にポート番号は不要（自動で443/80に変換される）
+            const wsUrl = `${protocol}//${window.location.host.split(':')[0]}/ws/${schoolId}`;
             const ws = new WebSocket(wsUrl);
-            ws.onmessage = (event) => { if (event.data === "RELOAD") init(); };
+
+            ws.onmessage = (event) => {
+                if (event.data === "RELOAD") {
+                    // 全コンテンツを再ロード
+                    init(); 
+                }
+            };
             ws.onclose = () => setTimeout(connectWs, 5000);
         }
 
         init();
         if (navigator.onLine) connectWs();
-        setInterval(init, 60000);
+        
+        // 外部API依存コンテンツの定期更新（天気など）
+        setInterval(init, 600000); // 10分ごと
     </script>
 </body>
 </html>

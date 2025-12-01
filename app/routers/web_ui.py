@@ -1,17 +1,21 @@
 import shutil
 import os
+import json
+import re
 from datetime import datetime
 from fastapi import APIRouter, Depends, Request, Form, UploadFile, File, status
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from passlib.context import CryptContext
 
 from app.core.database import get_db
 from app.models import models
 from app.services.websocket import manager
 
-router = APIRouter()
+# ★修正: APIRouterをインポートし、ルーターオブジェクトを定義
+router = APIRouter() 
 templates = Jinja2Templates(directory="templates")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -20,26 +24,16 @@ def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @router.post("/login")
-def login(
-    request: Request, 
-    school_id: str = Form(...),   # 追加: 学校IDを受け取る
-    username: str = Form(...), 
-    password: str = Form(...), 
-    db: Session = Depends(get_db)
-):
+def login(request: Request, school_id: str = Form(...), username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.username == username).first()
     
-    # 1. ユーザー存在チェック & パスワードチェック
     if not user or not pwd_context.verify(password, user.hashed_password):
         return templates.TemplateResponse("login.html", {"request": request, "error": "IDまたはパスワードが違います"})
     
-    # 2. 所属学校チェック (システム管理者は除外)
     if user.role != models.UserRole.SUPER_ADMIN:
-        # ユーザーが学校に所属していない、または入力されたIDと所属IDが不一致の場合
         if not user.school_id or user.school_id != school_id:
             return templates.TemplateResponse("login.html", {"request": request, "error": "所属学校の情報が一致しません"})
     
-    # ログイン成功処理
     request.session["user_id"] = user.id
     
     if user.role == models.UserRole.SUPER_ADMIN:
@@ -64,7 +58,6 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 
     school = user.school
     
-    # システム管理者が間違ってアクセスした場合のリダイレクト
     if not school:
         if user.role == models.UserRole.SUPER_ADMIN:
             return RedirectResponse(url="/super_admin/dashboard")
@@ -82,7 +75,24 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     slots_data = []
     for slot in sorted(school.slots, key=lambda x: x.position):
         content = db.query(models.Content).filter(models.Content.slot_id == slot.id).first()
-        slots_data.append({"slot": slot, "content": content})
+        
+        slot_dict = {
+            "id": slot.id,
+            "position": slot.position,
+            "content_type": slot.content_type
+        }
+        
+        content_dict = {}
+        if content:
+            content_dict = {
+                "body": content.body,
+                "media_url": content.media_url,
+                "style_config": content.style_config or {},
+                "start_at": content.start_at.isoformat() if content.start_at else None,
+                "end_at": content.end_at.isoformat() if content.end_at else None,
+            }
+            
+        slots_data.append({"slot": slot_dict, "content": content_dict})
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
@@ -101,6 +111,22 @@ async def update_content(
     start_at: str = Form(None),
     end_at: str = Form(None),
     theme: str = Form("default"),
+    # スタイル設定
+    style_bg_color: str = Form(None),
+    style_text_color: str = Form(None),
+    style_font_size: str = Form(None),
+    style_text_align: str = Form(None),
+    style_font_weight: str = Form(None),
+    # 配置設定
+    style_justify_content: str = Form(None), 
+    style_align_items: str = Form(None),     
+    style_flex_direction: str = Form(None),
+    # 配置情報（JSON）
+    style_elements_layout: str = Form(None),
+    # 画像削除フラグ
+    delete_image: str = Form(None),
+    # レンダリング済み画像
+    generated_image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
     user_id = request.session.get("user_id")
@@ -115,29 +141,60 @@ async def update_content(
     if body is not None:
         content.body = body
     
-    # 日時変換処理 (空文字や不正なフォーマットを考慮)
     if start_at:
         try:
-            # HTML input type="datetime-local" format or Flatpickr format
             fmt = "%Y-%m-%dT%H:%M" if "T" in start_at else "%Y-%m-%d %H:%M"
             content.start_at = datetime.strptime(start_at, fmt)
-        except ValueError:
-            pass
-    else:
-        content.start_at = None
+        except ValueError: pass
+    else: content.start_at = None
 
     if end_at:
         try:
             fmt = "%Y-%m-%dT%H:%M" if "T" in end_at else "%Y-%m-%d %H:%M"
             content.end_at = datetime.strptime(end_at, fmt)
-        except ValueError:
-            pass
-    else:
-        content.end_at = None
+        except ValueError: pass
+    else: content.end_at = None
 
     content.theme = theme
 
-    if file and file.filename:
+    # スタイル情報の保存
+    current_style = dict(content.style_config or {})
+
+    if style_bg_color is not None: current_style["bg_color"] = style_bg_color
+    if style_text_color is not None: current_style["text_color"] = style_text_color
+    if style_font_size is not None: current_style["font_size"] = style_font_size
+    if style_text_align is not None: current_style["text_align"] = style_text_align
+    if style_font_weight is not None: current_style["font_weight"] = style_font_weight
+    if style_justify_content is not None: current_style["justify_content"] = style_justify_content
+    if style_align_items is not None: current_style["align_items"] = style_align_items
+    if style_flex_direction is not None: current_style["flex_direction"] = style_flex_direction
+
+    # 配置情報の保存
+    if style_elements_layout:
+        try:
+            layout_data = json.loads(style_elements_layout)
+            current_style["elements_layout"] = layout_data
+        except json.JSONDecodeError: pass
+    
+    # レンダリング済み画像の保存処理
+    if generated_image and generated_image.filename:
+        os.makedirs("static/rendered", exist_ok=True)
+        timestamp = int(datetime.now().timestamp())
+        render_filename = f"render_slot_{slot_id}_{timestamp}.png"
+        render_path = f"static/rendered/{render_filename}"
+        
+        with open(render_path, "wb+") as file_object:
+            shutil.copyfileobj(generated_image.file, file_object)
+        
+        current_style["rendered_image_url"] = f"/static/rendered/{render_filename}"
+
+    content.style_config = current_style
+    flag_modified(content, "style_config")
+
+    # 素材画像の処理
+    if delete_image == 'true':
+        content.media_url = None
+    elif file and file.filename:
         os.makedirs("static", exist_ok=True)
         filename = f"slot_{slot_id}_{file.filename}"
         file_location = f"static/{filename}"
@@ -146,6 +203,7 @@ async def update_content(
         content.media_url = f"/static/{filename}"
 
     db.commit()
+    db.refresh(content)
 
     await manager.broadcast("RELOAD")
 
